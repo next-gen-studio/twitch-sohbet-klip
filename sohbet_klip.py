@@ -141,8 +141,16 @@ def parca_indir(tdl, vod, baslangic, sure, hedef, kalite):
             k += ["--oauth", oauth]
         denemeler.append(("TwitchDownloaderCLI", k))
     if shutil.which("yt-dlp"):
+        ek = []
+        oauth = os.environ.get("TWITCH_OAUTH", "").strip()
+        if oauth:
+            cerez = os.path.join(os.path.dirname(hedef) or ".", ".twitch_cerez.txt")
+            with open(cerez, "w") as f:
+                f.write("# Netscape HTTP Cookie File\n")
+                f.write(f".twitch.tv\tTRUE\t/\tTRUE\t0\tauth-token\t{oauth}\n")
+            ek = ["--cookies", cerez]
         denemeler.append(("yt-dlp", [
-            "yt-dlp", "-q", "--no-warnings", "--force-overwrites",
+            "yt-dlp", "-q", "--no-warnings", "--force-overwrites", *ek,
             "--download-sections", f"*{int(baslangic)}-{bitis}",
             "-f", "best[height<=1080]/best", "--merge-output-format", "mp4",
             "-o", hedef, f"https://www.twitch.tv/videos/{vod}"]))
