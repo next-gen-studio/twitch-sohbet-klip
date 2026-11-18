@@ -126,7 +126,7 @@ def anlari_bul(ofsetler, dilim, esik, aralik, adet, uzunluk=None, atla=0, mod="t
         if z < esik:
             continue
         tepki_say = komik[i] + aksiyon[i]
-        if mod == "tepki" and tepki_say < max(3, 0.15 * toplam[i]):
+        if mod == "tepki" and tepki_say < max(2, 0.15 * toplam[i]):
             continue  # sadece kalabalik, ama kimse gulmuyor/sasirmiyor
         tur = "komik" if komik[i] >= aksiyon[i] else "aksiyon"
         adaylar.append({"an": i * dilim, "mesaj": toplam[i], "puan": puan[i],
@@ -181,6 +181,15 @@ def ffmpeg_kes(kaynak, baslangic, sure, cikti, duzen, kamera):
         "-movflags", "+faststart", cikti,
     ]
     subprocess.run(komut, check=True)
+
+
+def ses_seviyesi(yol):
+    """Klibin ortalama ses seviyesi (dB). Twitch telifli muzik yuzunden
+    VOD'un bazi bolumlerini tamamen susturur; bunlari ayiklamak icin."""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-i", yol, "-af", "volumedetect",
+                        "-f", "null", "-"], capture_output=True, text=True)
+    m = re.search(r"mean_volume: (-?[0-9.]+) dB", r.stderr)
+    return float(m.group(1)) if m else None
 
 
 def parca_indir(tdl, vod, baslangic, sure, hedef, kalite):
@@ -255,6 +264,9 @@ def main():
     print(f"{len(ofsetler)} mesaj okundu, "
           f"{sum(1 for _, t in ofsetler if t)} tanesi gulme/heyecan tepkisi.")
     anlar = anlari_bul(ofsetler, a.dilim, a.esik, a.aralik, a.adet, uzunluk, a.atla, a.mod)
+    if len(anlar) < 3 and a.esik > 1.5:
+        print(f"Esik {a.esik} ile az an cikti ({len(anlar)}); esik 1.5'e dusuruldu.")
+        anlar = anlari_bul(ofsetler, a.dilim, 1.5, a.aralik, a.adet, uzunluk, a.atla, a.mod)
     if not anlar:
         print("Esigi gecen bir sohbet patlamasi bulunamadi.")
     os.makedirs(a.cikti, exist_ok=True)
@@ -279,6 +291,10 @@ def main():
                 parca_indir(a.tdl, a.vod, baslangic, sure, ham, a.kalite)
                 ffmpeg_kes(ham, 0, sure, yol, a.duzen, kamera)
                 os.remove(ham)
+            ses = ses_seviyesi(yol)
+            if ses is not None and ses < -55:
+                os.remove(yol)
+                raise RuntimeError(f"ses yok ({ses} dB) - Twitch bu bolumu telif yuzunden susturmus")
         except (subprocess.CalledProcessError, RuntimeError) as e:
             print(f"   ATLANDI: {e}")
             if not kayitlar and sira >= 2:
