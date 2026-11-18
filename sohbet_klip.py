@@ -55,11 +55,12 @@ def saat_yazi(sn):
 KOMIK = re.compile(
     r"(KEKW|OMEGALUL|LULW?|ICANT|LMAO+|LMFAO|ROFL|\bLOL+\b|\bXD+\b|(?:ha){2,}|(?:ah){2,}|"
     r"(?:ja){2,}|(?:sj){2,}|(?:js){2,}|\bkk{2,}|ajsk|asdf|pfff|😂|🤣|💀|☠|ölüyorum|oldum|"
-    r"gülmekten|komik|aşırı iyi)", re.I)
+    r"gülmekten|komik|aşırı iyi|"
+    r"(?:ах){2,}|(?:ха){2,}|(?:хах)|\bору\b|\bлол\b|\bкек\b|ржу|ржака|угар|смешно)", re.I)
 AKSIYON = re.compile(
     r"(POG|POGGERS|PogU|\bWTF\b|\bOMG\b|HOLY|\bW+\b|CLIP|KLİP|KLIP|monkaS|NOO+|\bEZ+\b|"
     r"INSANE|CRAZY|\bGG\b|😱|🔥|😳|🤯|yok art[ıi]k|efsane|vay|helal|inanılmaz|nasıl ya|"
-    r"aaa+|ooo+)", re.I)
+    r"aaa+|ooo+|жесть|офиген|имба|вау|нифига|ого+|капец)", re.I)
 
 
 def tepki(metin):
