@@ -1,3 +1,2 @@
 # Islenecek VOD ID ya da linkleri, her satira bir tane.
 # Bu dosyaya ekleyip kaydettiginizde (push) is hemen baslar.
-2932148466 --atla 10800 --duzen kamera --kamera 0.80,0.66,0.20,0.34 # deneme 3
