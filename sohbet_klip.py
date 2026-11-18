@@ -212,6 +212,10 @@ def main():
                 os.remove(ham)
         except (subprocess.CalledProcessError, RuntimeError) as e:
             print(f"   ATLANDI: {e}")
+            if not kayitlar and sira >= 2:
+                print("Ilk iki parca da indirilemedi; VOD abonelere ozel ya da erisilemiyor "
+                      "olabilir. Bu VOD birakildi.")
+                break
             continue
         kayitlar.append({
             "dosya": ad, "an_sn": an["an"], "an": saat_yazi(an["an"]),
