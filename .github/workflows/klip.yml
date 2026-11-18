@@ -28,7 +28,7 @@ jobs:
       vodlar: ${{ steps.bul.outputs.vodlar }}
       sayi: ${{ steps.bul.outputs.sayi }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - id: bul
         env:
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
@@ -49,16 +49,19 @@ jobs:
     env:
       VOD: ${{ matrix.vod }}
       GH_TOKEN: ${{ github.token }}
+      TWITCH_OAUTH: ${{ secrets.TWITCH_OAUTH }}
       KLIP_ADET: ${{ vars.KLIP_ADET || '10' }}
       KLIP_SURE: ${{ vars.KLIP_SURE || '40' }}
       KLIP_ONCE: ${{ vars.KLIP_ONCE || '20' }}
       KLIP_DUZEN: ${{ vars.KLIP_DUZEN || 'orta' }}
       KLIP_KAMERA: ${{ vars.KLIP_KAMERA || '0.75,0.70,0.25,0.30' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: ffmpeg kur
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: ffmpeg ve yt-dlp kur
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          pip install -q -U yt-dlp
 
       - name: TwitchDownloaderCLI indir
         run: |
@@ -99,7 +102,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       VODLAR: ${{ needs.bul.outputs.vodlar }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Islenenleri kaydet
         run: |
           for v in $(echo "$VODLAR" | python3 -c "import json,sys;print(' '.join(json.load(sys.stdin)))"); do

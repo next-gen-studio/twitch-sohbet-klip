@@ -127,16 +127,33 @@ def ffmpeg_kes(kaynak, baslangic, sure, cikti, duzen, kamera):
 
 
 def parca_indir(tdl, vod, baslangic, sure, hedef, kalite):
-    if os.path.exists(hedef):
-        os.remove(hedef)
-    komut = [
-        tdl, "videodownload", "--id", str(vod),
-        "-b", f"{int(baslangic)}s", "-e", f"{int(math.ceil(baslangic + sure))}s",
-        "-o", hedef, "--ffmpeg-path", shutil.which("ffmpeg") or "ffmpeg",
-    ]
-    if kalite:
-        komut += ["-q", kalite]
-    subprocess.run(komut, check=True)
+    """Once TwitchDownloaderCLI, olmazsa yt-dlp ile sadece o parcayi indirir."""
+    bitis = int(math.ceil(baslangic + sure))
+    denemeler = []
+    if shutil.which(tdl) or os.path.exists(tdl):
+        k = [tdl, "videodownload", "--id", str(vod),
+             "-b", f"{int(baslangic)}s", "-e", f"{bitis}s",
+             "-o", hedef, "--ffmpeg-path", shutil.which("ffmpeg") or "ffmpeg"]
+        if kalite:
+            k += ["-q", kalite]
+        oauth = os.environ.get("TWITCH_OAUTH", "").strip()
+        if oauth:
+            k += ["--oauth", oauth]
+        denemeler.append(("TwitchDownloaderCLI", k))
+    if shutil.which("yt-dlp"):
+        denemeler.append(("yt-dlp", [
+            "yt-dlp", "-q", "--no-warnings", "--force-overwrites",
+            "--download-sections", f"*{int(baslangic)}-{bitis}",
+            "-f", "best[height<=1080]/best", "--merge-output-format", "mp4",
+            "-o", hedef, f"https://www.twitch.tv/videos/{vod}"]))
+    for ad, komut in denemeler:
+        if os.path.exists(hedef):
+            os.remove(hedef)
+        r = subprocess.run(komut)
+        if r.returncode == 0 and os.path.exists(hedef) and os.path.getsize(hedef) > 0:
+            return
+        print(f"   {ad} ile indirilemedi (kod {r.returncode}).")
+    raise RuntimeError("parca indirilemedi")
 
 
 def main():
@@ -185,13 +202,17 @@ def main():
               f"  (z={an['z']})  ->  {ad}")
         if a.sadece_bul:
             continue
-        if a.video:
-            ffmpeg_kes(a.video, baslangic, sure, yol, a.duzen, kamera)
-        else:
-            ham = os.path.join(a.cikti, f".ham_{sira:02d}.mp4")
-            parca_indir(a.tdl, a.vod, baslangic, sure, ham, a.kalite)
-            ffmpeg_kes(ham, 0, sure, yol, a.duzen, kamera)
-            os.remove(ham)
+        try:
+            if a.video:
+                ffmpeg_kes(a.video, baslangic, sure, yol, a.duzen, kamera)
+            else:
+                ham = os.path.join(a.cikti, f".ham_{sira:02d}.mp4")
+                parca_indir(a.tdl, a.vod, baslangic, sure, ham, a.kalite)
+                ffmpeg_kes(ham, 0, sure, yol, a.duzen, kamera)
+                os.remove(ham)
+        except (subprocess.CalledProcessError, RuntimeError) as e:
+            print(f"   ATLANDI: {e}")
+            continue
         kayitlar.append({
             "dosya": ad, "an_sn": an["an"], "an": saat_yazi(an["an"]),
             "baslangic_sn": baslangic, "sure_sn": sure,
@@ -201,6 +222,8 @@ def main():
     with open(os.path.join(a.cikti, "klipler.json"), "w", encoding="utf-8") as f:
         json.dump(kayitlar, f, ensure_ascii=False, indent=2)
     print(f"Bitti: {len(kayitlar)} klip -> {a.cikti}/")
+    if anlar and not kayitlar and not a.sadece_bul:
+        sys.exit("Hicbir klip uretilemedi.")
 
 
 if __name__ == "__main__":
