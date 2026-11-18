@@ -19,7 +19,9 @@ Ayarlar:
   --sure 40    klip kac saniye olsun
   --esik 2     ortalamanin kac standart sapma ustu "patlama" sayilsin
   --aralik 60  birbirine bundan yakin anlardan sadece en yogunu kalsin
-  --duzen orta|kamera
+  --atla 1200  yayinin ilk kac saniyesi yok sayilsin (acilis/bekleme ekrani)
+  --duzen tam|orta|kamera
+               tam   : oyunun tamami ortada, arkasi bulanik (varsayilan)
                orta  : goruntunun ortasindan 9:16 kirpar
                kamera: ustte yayincinin kamerasi, altta oyun
   --kamera x,y,g,y  kamera kutusu, kaynak goruntunun orani olarak
@@ -28,6 +30,7 @@ Ayarlar:
 
 import argparse
 import json
+import re
 import math
 import os
 import shutil
@@ -49,6 +52,26 @@ def saat_yazi(sn):
     return f"{sn // 3600:d}:{(sn % 3600) // 60:02d}:{sn % 60:02d}"
 
 
+KOMIK = re.compile(
+    r"(KEKW|OMEGALUL|LULW?|ICANT|LMAO+|LMFAO|ROFL|\bLOL+\b|\bXD+\b|(?:ha){2,}|(?:ah){2,}|"
+    r"(?:ja){2,}|(?:sj){2,}|(?:js){2,}|\bkk{2,}|ajsk|asdf|pfff|😂|🤣|💀|☠|ölüyorum|oldum|"
+    r"gülmekten|komik|aşırı iyi)", re.I)
+AKSIYON = re.compile(
+    r"(POG|POGGERS|PogU|\bWTF\b|\bOMG\b|HOLY|\bW+\b|CLIP|KLİP|KLIP|monkaS|NOO+|\bEZ+\b|"
+    r"INSANE|CRAZY|\bGG\b|😱|🔥|😳|🤯|yok art[ıi]k|efsane|vay|helal|inanılmaz|nasıl ya|"
+    r"aaa+|ooo+)", re.I)
+
+
+def tepki(metin):
+    if not metin:
+        return None
+    if KOMIK.search(metin):
+        return "komik"
+    if AKSIYON.search(metin):
+        return "aksiyon"
+    return None
+
+
 def sohbeti_oku(yol):
     with open(yol, encoding="utf-8") as f:
         veri = json.load(f)
@@ -56,7 +79,10 @@ def sohbeti_oku(yol):
     for c in veri.get("comments", []):
         t = c.get("content_offset_seconds")
         if isinstance(t, (int, float)) and t >= 0:
-            ofsetler.append(float(t))
+            msg = c.get("message") or {}
+            metin = msg.get("body") or " ".join(
+                fr.get("text", "") for fr in (msg.get("fragments") or []))
+            ofsetler.append((float(t), tepki(metin)))
     uzunluk = None
     video = veri.get("video") or {}
     for anahtar in ("length", "end"):
@@ -66,24 +92,47 @@ def sohbeti_oku(yol):
     return ofsetler, uzunluk
 
 
-def anlari_bul(ofsetler, dilim, esik, aralik, adet, uzunluk=None):
+def anlari_bul(ofsetler, dilim, esik, aralik, adet, uzunluk=None, atla=0, mod="tepki"):
+    """Her dilime puan verir. mod=tepki: komik/aksiyon tepkileri 3 kat sayilir,
+    boylece sadece yogun degil, gulme ve heyecan patlamalari one cikar."""
+    ofsetler = [o for o in ofsetler if o[0] >= atla]
     if not ofsetler:
         return []
-    son = max(max(ofsetler), uzunluk or 0)
-    dilim_sayisi = int(son // dilim) + 1
-    sayim = [0] * dilim_sayisi
-    for t in ofsetler:
-        sayim[int(t // dilim)] += 1
-    ort = statistics.fmean(sayim)
-    sapma = statistics.pstdev(sayim)
+    son = max(max(t for t, _ in ofsetler), uzunluk or 0)
+    n_dilim = int(son // dilim) + 1
+    ilk = int(atla // dilim)
+    toplam = [0] * n_dilim
+    komik = [0] * n_dilim
+    aksiyon = [0] * n_dilim
+    for t, tur in ofsetler:
+        i = int(t // dilim)
+        toplam[i] += 1
+        if tur == "komik":
+            komik[i] += 1
+        elif tur == "aksiyon":
+            aksiyon[i] += 1
+    if mod == "tepki":
+        puan = [toplam[i] + 2 * (komik[i] + aksiyon[i]) for i in range(n_dilim)]
+    else:
+        puan = toplam
+    hesap = puan[ilk:] or [0]
+    ort = statistics.fmean(hesap)
+    sapma = statistics.pstdev(hesap)
     if sapma == 0:
         return []
     adaylar = []
-    for i, n in enumerate(sayim):
-        z = (n - ort) / sapma
-        if z >= esik:
-            adaylar.append({"an": i * dilim, "mesaj": n, "z": round(z, 2)})
-    adaylar.sort(key=lambda a: (-a["mesaj"], a["an"]))
+    for i in range(ilk, n_dilim):
+        z = (puan[i] - ort) / sapma
+        if z < esik:
+            continue
+        tepki_say = komik[i] + aksiyon[i]
+        if mod == "tepki" and tepki_say < max(3, 0.15 * toplam[i]):
+            continue  # sadece kalabalik, ama kimse gulmuyor/sasirmiyor
+        tur = "komik" if komik[i] >= aksiyon[i] else "aksiyon"
+        adaylar.append({"an": i * dilim, "mesaj": toplam[i], "puan": puan[i],
+                        "komik": komik[i], "aksiyon": aksiyon[i], "tur": tur,
+                        "z": round(z, 2)})
+    adaylar.sort(key=lambda a: (-a["puan"], a["an"]))
     secilen = []
     for a in adaylar:
         if all(abs(a["an"] - s["an"]) >= aralik for s in secilen):
@@ -94,6 +143,14 @@ def anlari_bul(ofsetler, dilim, esik, aralik, adet, uzunluk=None):
 
 
 def filtre(duzen, kamera):
+    if duzen == "tam":
+        return (
+            "[0:v]split=2[a][b];"
+            f"[a]scale={GENISLIK}:{YUKSEKLIK}:force_original_aspect_ratio=increase,"
+            f"crop={GENISLIK}:{YUKSEKLIK},boxblur=30:3,eq=brightness=-0.08[arka];"
+            f"[b]scale={GENISLIK}:-2[on];"
+            "[arka][on]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p[v]"
+        )
     if duzen == "kamera":
         x, y, g, h = kamera
         return (
@@ -176,7 +233,10 @@ def main():
     p.add_argument("--esik", type=float, default=2)
     p.add_argument("--aralik", type=float, default=60)
     p.add_argument("--cikti", default="klipler")
-    p.add_argument("--duzen", choices=["orta", "kamera"], default="orta")
+    p.add_argument("--duzen", choices=["tam", "orta", "kamera"], default="tam")
+    p.add_argument("--atla", type=float, default=0, help="ilk kac saniye yok sayilsin")
+    p.add_argument("--mod", choices=["tepki", "yogunluk"], default="tepki",
+                   help="tepki: gulme/heyecan mesajlarini one cikarir; yogunluk: sadece mesaj sayisi")
     p.add_argument("--kamera", default="0.75,0.70,0.25,0.30",
                    help="x,y,genislik,yukseklik (0-1 arasi oran)")
     p.add_argument("--tdl", default=os.environ.get("TDL", "TwitchDownloaderCLI"))
@@ -192,8 +252,9 @@ def main():
         p.error("--kamera dort sayi olmali: x,y,genislik,yukseklik")
 
     ofsetler, uzunluk = sohbeti_oku(a.chat)
-    print(f"{len(ofsetler)} mesaj okundu.")
-    anlar = anlari_bul(ofsetler, a.dilim, a.esik, a.aralik, a.adet, uzunluk)
+    print(f"{len(ofsetler)} mesaj okundu, "
+          f"{sum(1 for _, t in ofsetler if t)} tanesi gulme/heyecan tepkisi.")
+    anlar = anlari_bul(ofsetler, a.dilim, a.esik, a.aralik, a.adet, uzunluk, a.atla, a.mod)
     if not anlar:
         print("Esigi gecen bir sohbet patlamasi bulunamadi.")
     os.makedirs(a.cikti, exist_ok=True)
@@ -204,10 +265,10 @@ def main():
         sure = a.sure
         if uzunluk:
             sure = max(1.0, min(sure, uzunluk - baslangic))
-        ad = f"klip_{sira:02d}_{zaman_yazi(baslangic)}.mp4"
+        ad = f"klip_{sira:02d}_{an['tur']}_{zaman_yazi(baslangic)}.mp4"
         yol = os.path.join(a.cikti, ad)
-        print(f"{sira:2d}. an {saat_yazi(an['an'])}  |  {an['mesaj']} mesaj/{int(a.dilim)} sn"
-              f"  (z={an['z']})  ->  {ad}")
+        print(f"{sira:2d}. an {saat_yazi(an['an'])}  |  {an['mesaj']} mesaj/{int(a.dilim)} sn, "
+              f"{an['komik']} gulme, {an['aksiyon']} heyecan  (z={an['z']})  ->  {ad}")
         if a.sadece_bul:
             continue
         try:
@@ -228,7 +289,8 @@ def main():
         kayitlar.append({
             "dosya": ad, "an_sn": an["an"], "an": saat_yazi(an["an"]),
             "baslangic_sn": baslangic, "sure_sn": sure,
-            "mesaj": an["mesaj"], "z": an["z"], "vod": a.vod,
+            "mesaj": an["mesaj"], "komik": an["komik"], "aksiyon": an["aksiyon"],
+            "tur": an["tur"], "z": an["z"], "vod": a.vod,
         })
 
     with open(os.path.join(a.cikti, "klipler.json"), "w", encoding="utf-8") as f:

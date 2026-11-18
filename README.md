@@ -20,6 +20,8 @@ Bu anahtar hesabınıza erişim sağlar, kimseyle paylaşmayın. Twitch'ten çı
 - **Yol A:** `istek.txt` dosyasına VOD linkini ekleyip kaydedin (ör. `https://www.twitch.tv/videos/2345678901`). İş hemen başlar.
 - **Yol B:** **Actions → Sohbet klipleri → Run workflow** seçip VOD ID'sini yazın.
 
+Bir yayına özel ayar vermek için VOD'un yanına yazın, ör. `2932148466 --atla 10800 --duzen kamera --kamera 0.80,0.66,0.20,0.34`
+
 Klipler **Releases** bölümünde `vod-<ID>` adıyla çıkar. Her klibin anı ve mesaj sayısı `klipler.json` dosyasında listelenir.
 
 ### 2. Yayıncıları otomatik takip etmek
@@ -36,7 +38,9 @@ Tarama günde 4 kez yapılır: İstanbul saatiyle 03:17, 09:17, 15:17 ve 21:17. 
 | `KLIP_ADET` | 10 | Yayın başına en fazla kaç klip çıkacağı |
 | `KLIP_SURE` | 40 | Klibin süresi (saniye) |
 | `KLIP_ONCE` | 20 | Klibin, bulunan andan kaç saniye önce başlayacağı |
-| `KLIP_DUZEN` | orta | `orta`: görüntünün ortasından 9:16 kırpar. `kamera`: üstte yayıncının kamerası, altta oyun |
+| `KLIP_MOD` | tepki | `tepki`: gülme (KEKW, ahaha, 😂…) ve heyecan (WTF, POG, yok artık…) mesajlarının patladığı anları seçer; klipler `komik` / `aksiyon` diye adlandırılır. `yogunluk`: sadece mesaj sayısına bakar |
+| `KLIP_ATLA` | 1200 | Yayının ilk kaç saniyesi yok sayılır (açılış/bekleme ekranı) |
+| `KLIP_DUZEN` | tam | `tam`: oyunun tamamı ortada, arkası bulanık. `orta`: görüntünün ortasından 9:16 kırpar. `kamera`: üstte yayıncının kamerası, altta oyun |
 | `KLIP_KAMERA` | 0.75,0.70,0.25,0.30 | Kamera kutusunun yeri: x,y,genişlik,yükseklik (görüntünün oranı olarak). Örnekteki değer sağ alt köşeyi gösterir |
 
 ## Bilgisayarda çalıştırmak

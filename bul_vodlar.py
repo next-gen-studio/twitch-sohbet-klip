@@ -85,17 +85,23 @@ def main():
     a = p.parse_args()
 
     islenen = set(filter(None, map(vod_id, satirlar("islenenler.txt"))))
-    adaylar = []
+    adaylar = []  # (vod, ek ayarlar)
     for s in [a.ek] + satirlar("istek.txt"):
         v = vod_id(s) if s else None
         if v:
-            adaylar.append(v)
-    adaylar += helix_vodlari(satirlar("yayincilar.txt"), a.en_fazla, a.son_saat)
+            # satirda VOD'dan sonra yazilan ayarlar: or. "--atla 3600 --duzen kamera"
+            ayar = s.split(v, 1)[1].strip()
+            if not re.fullmatch(r"[A-Za-z0-9.,=\- ]*", ayar):
+                print(f"UYARI: {v} icin gecersiz ayar yok sayildi: {ayar}")
+                ayar = ""
+            adaylar.append((v, ayar))
+    adaylar += [(v, "") for v in helix_vodlari(satirlar("yayincilar.txt"), a.en_fazla, a.son_saat)]
 
-    sonuc = []
-    for v in adaylar:
-        if v not in islenen and v not in sonuc:
-            sonuc.append(v)
+    sonuc, gorulen = [], set()
+    for v, ayar in adaylar:
+        if v not in islenen and v not in gorulen:
+            gorulen.add(v)
+            sonuc.append({"vod": v, "ayar": ayar})
     sonuc = sonuc[: a.limit]
     print("Islenecek VOD'lar:", sonuc or "yok")
 

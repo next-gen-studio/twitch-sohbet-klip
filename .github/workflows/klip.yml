@@ -45,15 +45,18 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        vod: ${{ fromJson(needs.bul.outputs.vodlar) }}
+        is: ${{ fromJson(needs.bul.outputs.vodlar) }}
     env:
-      VOD: ${{ matrix.vod }}
+      VOD: ${{ matrix.is.vod }}
+      AYAR: ${{ matrix.is.ayar }}
       GH_TOKEN: ${{ github.token }}
       TWITCH_OAUTH: ${{ secrets.TWITCH_OAUTH }}
       KLIP_ADET: ${{ vars.KLIP_ADET || '10' }}
       KLIP_SURE: ${{ vars.KLIP_SURE || '40' }}
       KLIP_ONCE: ${{ vars.KLIP_ONCE || '20' }}
-      KLIP_DUZEN: ${{ vars.KLIP_DUZEN || 'orta' }}
+      KLIP_DUZEN: ${{ vars.KLIP_DUZEN || 'tam' }}
+      KLIP_ATLA: ${{ vars.KLIP_ATLA || '1200' }}
+      KLIP_MOD: ${{ vars.KLIP_MOD || 'tepki' }}
       KLIP_KAMERA: ${{ vars.KLIP_KAMERA || '0.75,0.70,0.25,0.30' }}
     steps:
       - uses: actions/checkout@v5
@@ -77,16 +80,17 @@ jobs:
         run: |
           python3 sohbet_klip.py chat.json --vod "$VOD" \
             --adet "$KLIP_ADET" --sure "$KLIP_SURE" --once "$KLIP_ONCE" \
-            --duzen "$KLIP_DUZEN" --kamera "$KLIP_KAMERA"
+            --duzen "$KLIP_DUZEN" --kamera "$KLIP_KAMERA" \
+            --atla "$KLIP_ATLA" --mod "$KLIP_MOD" $AYAR
 
       - name: Klipleri release olarak yayinla
         run: |
           {
             echo "Kaynak: https://www.twitch.tv/videos/$VOD"
             echo
-            echo "| Klip | An | Mesaj / dilim |"
-            echo "|---|---|---|"
-            python3 -c "import json;[print(f\"| {k['dosya']} | {k['an']} | {k['mesaj']} |\") for k in json.load(open('klipler/klipler.json'))]"
+            echo "| Klip | Tur | An | Mesaj | Gulme | Heyecan |"
+            echo "|---|---|---|---|---|---|"
+            python3 -c "import json;[print(f\"| {k['dosya']} | {k['tur']} | {k['an']} | {k['mesaj']} | {k['komik']} | {k['aksiyon']} |\") for k in json.load(open('klipler/klipler.json'))]"
           } > notlar.md
           gh release delete "vod-$VOD" -y --cleanup-tag 2>/dev/null || true
           gh release create "vod-$VOD" klipler/klipler.json klipler/*.mp4 \
@@ -105,7 +109,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: Islenenleri kaydet
         run: |
-          for v in $(echo "$VODLAR" | python3 -c "import json,sys;print(' '.join(json.load(sys.stdin)))"); do
+          for v in $(echo "$VODLAR" | python3 -c "import json,sys;print(' '.join(x['vod'] for x in json.load(sys.stdin)))"); do
             if gh release view "vod-$v" >/dev/null 2>&1; then
               grep -qx "$v" islenenler.txt 2>/dev/null || echo "$v" >> islenenler.txt
               sed -i "/$v/d" istek.txt
