@@ -188,8 +188,10 @@ def ses_seviyesi(yol):
     VOD'un bazi bolumlerini tamamen susturur; bunlari ayiklamak icin."""
     r = subprocess.run(["ffmpeg", "-hide_banner", "-i", yol, "-af", "volumedetect",
                         "-f", "null", "-"], capture_output=True, text=True)
-    m = re.search(r"mean_volume: (-?[0-9.]+) dB", r.stderr)
-    return float(m.group(1)) if m else None
+    m = re.search(r"mean_volume: (-?inf|-?[0-9.]+) dB", r.stderr)
+    if not m:
+        return -999.0 if "Audio" not in r.stderr else None
+    return -999.0 if "inf" in m.group(1) else float(m.group(1))
 
 
 def parca_indir(tdl, vod, baslangic, sure, hedef, kalite):
