@@ -1,0 +1,62 @@
+name: Shorts edit
+
+on:
+  workflow_dispatch:
+    inputs:
+      zorla:
+        description: "Var olan edit'leri de yeniden uret (evet/hayir)"
+        required: false
+        default: "hayir"
+  push:
+    branches: [main]
+    paths: ["duzenle/**", "edit/**"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shorts-edit
+  cancel-in-progress: false
+
+jobs:
+  edit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TWITCH_OAUTH: ${{ secrets.TWITCH_OAUTH }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Sistem paketleri (ffmpeg, emoji fontu)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-noto-color-emoji
+          pip install -q -U yt-dlp faster-whisper numpy
+
+      - name: TwitchDownloaderCLI
+        run: |
+          gh release download --repo lay295/TwitchDownloader --pattern '*CLI*Linux-x64.zip' -O tdl.zip
+          unzip -o -q tdl.zip -d tdl && chmod +x tdl/TwitchDownloaderCLI
+          echo "TDL=$PWD/tdl/TwitchDownloaderCLI" >> "$GITHUB_ENV"
+
+      - name: Whisper modeli onbellegi
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-small-v1
+
+      - name: Remotion kur
+        working-directory: edit/remotion
+        run: |
+          npm ci --no-audit --no-fund
+          npx remotion browser ensure
+
+      - name: Senaryolari edit'le
+        run: |
+          if [ "${{ github.event.inputs.zorla }}" = "evet" ]; then Z="--zorla"; else Z=""; fi
+          python3 edit/duzenle.py $Z
