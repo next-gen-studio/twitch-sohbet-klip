@@ -1,0 +1,116 @@
+name: Sohbet klipleri
+
+on:
+  schedule:
+    # UTC 00:17, 06:17, 12:17, 18:17 = Istanbul 03:17, 09:17, 15:17, 21:17
+    - cron: "17 0,6,12,18 * * *"
+  workflow_dispatch:
+    inputs:
+      vod:
+        description: "VOD ID ya da twitch.tv/videos/... linki (bos = otomatik tara)"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths: [istek.txt]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sohbet-klip
+  cancel-in-progress: false
+
+jobs:
+  bul:
+    runs-on: ubuntu-latest
+    outputs:
+      vodlar: ${{ steps.bul.outputs.vodlar }}
+      sayi: ${{ steps.bul.outputs.sayi }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: bul
+        env:
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          EK: ${{ github.event.inputs.vod }}
+        run: python3 bul_vodlar.py --ek "$EK"
+
+  klip:
+    needs: bul
+    if: needs.bul.outputs.sayi != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        vod: ${{ fromJson(needs.bul.outputs.vodlar) }}
+    env:
+      VOD: ${{ matrix.vod }}
+      GH_TOKEN: ${{ github.token }}
+      KLIP_ADET: ${{ vars.KLIP_ADET || '10' }}
+      KLIP_SURE: ${{ vars.KLIP_SURE || '40' }}
+      KLIP_ONCE: ${{ vars.KLIP_ONCE || '20' }}
+      KLIP_DUZEN: ${{ vars.KLIP_DUZEN || 'orta' }}
+      KLIP_KAMERA: ${{ vars.KLIP_KAMERA || '0.75,0.70,0.25,0.30' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ffmpeg kur
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
+      - name: TwitchDownloaderCLI indir
+        run: |
+          gh release download --repo lay295/TwitchDownloader --pattern '*CLI*Linux-x64.zip' -O tdl.zip
+          unzip -o -q tdl.zip -d tdl
+          chmod +x tdl/TwitchDownloaderCLI
+          echo "TDL=$PWD/tdl/TwitchDownloaderCLI" >> "$GITHUB_ENV"
+
+      - name: Sohbeti indir
+        run: $TDL chatdownload --id "$VOD" -o chat.json
+
+      - name: Patlamalari bul ve sadece o parcalari kes
+        run: |
+          python3 sohbet_klip.py chat.json --vod "$VOD" \
+            --adet "$KLIP_ADET" --sure "$KLIP_SURE" --once "$KLIP_ONCE" \
+            --duzen "$KLIP_DUZEN" --kamera "$KLIP_KAMERA"
+
+      - name: Klipleri release olarak yayinla
+        run: |
+          {
+            echo "Kaynak: https://www.twitch.tv/videos/$VOD"
+            echo
+            echo "| Klip | An | Mesaj / dilim |"
+            echo "|---|---|---|"
+            python3 -c "import json;[print(f\"| {k['dosya']} | {k['an']} | {k['mesaj']} |\") for k in json.load(open('klipler/klipler.json'))]"
+          } > notlar.md
+          gh release delete "vod-$VOD" -y --cleanup-tag 2>/dev/null || true
+          gh release create "vod-$VOD" klipler/klipler.json klipler/*.mp4 \
+            --title "VOD $VOD klipleri" --notes-file notlar.md 2>/dev/null \
+          || gh release create "vod-$VOD" klipler/klipler.json \
+            --title "VOD $VOD klipleri" --notes-file notlar.md
+
+  kaydet:
+    needs: [bul, klip]
+    if: always() && needs.bul.outputs.sayi != '0'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VODLAR: ${{ needs.bul.outputs.vodlar }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Islenenleri kaydet
+        run: |
+          for v in $(echo "$VODLAR" | python3 -c "import json,sys;print(' '.join(json.load(sys.stdin)))"); do
+            if gh release view "vod-$v" >/dev/null 2>&1; then
+              grep -qx "$v" islenenler.txt 2>/dev/null || echo "$v" >> islenenler.txt
+              sed -i "/$v/d" istek.txt
+            fi
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add islenenler.txt istek.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "Islenen VOD'lar kaydedildi"
+          git pull --rebase -q && git push

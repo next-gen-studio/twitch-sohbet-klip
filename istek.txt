@@ -1,0 +1,2 @@
+# Islenecek VOD ID ya da linkleri, her satira bir tane.
+# Bu dosyaya ekleyip kaydettiginizde (push) is hemen baslar.
