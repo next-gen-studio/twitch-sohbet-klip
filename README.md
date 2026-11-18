@@ -6,6 +6,14 @@ Twitch yayınlarında sohbetin patladığı anları bulur ve her birinden dikey 
 
 **Fark:** 8 saatlik yayının tamamı indirilmez. Önce sadece sohbet indirilir (birkaç MB). Sonra yalnızca kliplik 40 saniyelik parçalar indirilir.
 
+## Önce yapılması gereken: Twitch girişi (zorunlu)
+Twitch, GitHub sunucularından giriş yapmadan gelen video isteklerini reddediyor ("Insufficient access to VOD, OAuth may be required"). Sohbet indirmesi giriş olmadan da çalışıyor, ama video parçaları için bir Twitch hesabının giriş anahtarı gerekiyor:
+1. Bilgisayarınızdaki tarayıcıda twitch.tv'ye giriş yapın. Bunun için ayrı, ikinci bir hesap kullanmanız önerilir.
+2. F12 tuşuyla geliştirici araçlarını açın, ardından **Application → Cookies → https://www.twitch.tv** yolunu izleyin ve `auth-token` değerini kopyalayın.
+3. Bu değeri repoda **Settings → Secrets and variables → Actions → New repository secret** altına `TWITCH_OAUTH` adıyla ekleyin.
+
+Bu anahtar hesabınıza erişim sağlar, kimseyle paylaşmayın. Twitch'ten çıkış yaparsanız anahtar geçersiz olur ve yenisini eklemeniz gerekir.
+
 ## Kullanım
 
 ### 1. Elle bir yayın işletmek (anahtar gerekmez)
