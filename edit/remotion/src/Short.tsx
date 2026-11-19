@@ -121,15 +121,6 @@ const Baslik: React.FC<{p: ShortProps}> = ({p}) => {
       }}>
         {p.baslik} <span style={{fontFamily: 'Noto Color Emoji'}}>{p.baslikEmoji}</span>
       </div>
-      {p.yayinci ? (
-        <div style={{
-          marginTop: 24, opacity: interpolate(frame, [6, 16], [0, 1], {extrapolateRight: 'clamp'}),
-          background: '#9146FF', color: 'white', fontFamily: 'Montserrat', fontWeight: 800, fontSize: 34,
-          padding: '8px 22px', borderRadius: 40,
-        }}>
-          <span style={{fontFamily: 'Noto Color Emoji'}}>🎮</span> {p.yayinci} on Twitch
-        </div>
-      ) : null}
     </div>
   );
 };
