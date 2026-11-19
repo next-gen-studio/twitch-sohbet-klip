@@ -135,6 +135,10 @@ mutation($input: CreatePostInput!) {
 
 
 def main():
+    if os.environ.get("ZERNIO_API_KEY", "").strip():
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import zernio_paylas
+        return zernio_paylas.main()
     anahtar = os.environ.get("BUFFER_API_KEY", "").strip()
     if not anahtar:
         log("BUFFER_API_KEY secret bulunamadi, paylasim atlandi")

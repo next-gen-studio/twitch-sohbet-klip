@@ -45,7 +45,10 @@ Tarama günde 4 kez yapılır: İstanbul saatiyle 03:17, 09:17, 15:17 ve 21:17. 
 | `KLIP_DUZEN` | tam | `tam`: oyunun tamamı ortada, arkası bulanık. `orta`: görüntünün ortasından 9:16 kırpar. `kamera`: üstte yayıncının kamerası, altta oyun |
 | `KLIP_KAMERA` | 0.75,0.70,0.25,0.30 | Kamera kutusunun yeri: x,y,genişlik,yükseklik (görüntünün oranı olarak). Örnekteki değer sağ alt köşeyi gösterir |
 
-## YouTube'a otomatik paylaşım (Buffer)
+## YouTube'a otomatik paylaşım (Zernio)
+`ZERNIO_API_KEY` secret'ı tanımlıysa paylaşım Buffer yerine Zernio ile yapılır (`edit/zernio_paylas.py`). Adında "Wanted Level" geçen YouTube hesabı otomatik bulunur. Bulunamazsa `ZERNIO_ACCOUNT_ID` değişkeni girilebilir. `"hemen": true` olan videolar hemen yayınlanır. `"plan"` ya da `"zaman"` saati olanlar render biter bitmez Zernio'da o saate zamanlanır, saat geçmişse hemen yayınlanır.
+
+## YouTube'a otomatik paylaşım (Buffer, eski)
 Edit'li Shorts videoları üretildikten sonra `edit/paylas.py` onları Buffer üzerinden YouTube kanalının kuyruğuna ekler. Videolar, Buffer'da o kanal için ayarlanan paylaşım saatlerinde yayınlanır.
 - Gerekli secret: `BUFFER_API_KEY`. Kanalın kendi Gmail'iyle açılan Buffer hesabının API anahtarı olmalı.
 - İsteğe bağlı değişkenler (Settings → Variables → Actions): `PAYLAS_ADET` bir çalışmada en fazla kaç video gönderileceğini belirler (varsayılan 1). `BUFFER_CHANNEL_ID` boş bırakılırsa hesaptaki YouTube kanalı otomatik bulunur.

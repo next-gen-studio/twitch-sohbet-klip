@@ -65,6 +65,8 @@ jobs:
         if: always()
         env:
           BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+          ZERNIO_API_KEY: ${{ secrets.ZERNIO_API_KEY }}
+          ZERNIO_ACCOUNT_ID: ${{ vars.ZERNIO_ACCOUNT_ID }}
           BUFFER_CHANNEL_ID: ${{ vars.BUFFER_CHANNEL_ID }}
           PAYLAS_ADET: ${{ vars.PAYLAS_ADET || '1' }}
         run: python3 edit/paylas.py
