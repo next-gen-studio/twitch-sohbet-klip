@@ -73,6 +73,8 @@ def release_dosyalari(etiket):
 
 
 def metinler(sen):
+    if sen.get("seo_baslik") and sen.get("seo_aciklama"):
+        return sen["seo_baslik"][:100], sen["seo_aciklama"]
     baslik = sen["baslik"].strip()
     emoji = sen.get("baslik_emoji", "").strip()
     yayinci = sen.get("yayinci", "").strip()
@@ -138,14 +140,16 @@ def main():
         return 1
 
     hata = 0
-    for anahtar_ad, sen in adaylar[:adet]:
+    hemen = [x for x in adaylar if x[1].get("hemen")]
+    sira = hemen + [x for x in adaylar if not x[1].get("hemen")][:max(0, adet - len(hemen))]
+    for anahtar_ad, sen in sira:
         url = f"https://github.com/{depo}/releases/download/edit-{sen['vod']}/edit_{sen['klip']}"
         yt_baslik, aciklama = metinler(sen)
         girdi = {
             "text": aciklama,
             "channelId": kanal,
             "schedulingType": "automatic",
-            "mode": "addToQueue",
+            "mode": "shareNow" if sen.get("hemen") else "addToQueue",
             "needsApproval": False,
             "assets": [{"video": {"url": url}}],
             "metadata": {"youtube": {"title": yt_baslik, "categoryId": "20"}},
