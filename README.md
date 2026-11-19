@@ -43,6 +43,12 @@ Tarama günde 4 kez yapılır: İstanbul saatiyle 03:17, 09:17, 15:17 ve 21:17. 
 | `KLIP_DUZEN` | tam | `tam`: oyunun tamamı ortada, arkası bulanık. `orta`: görüntünün ortasından 9:16 kırpar. `kamera`: üstte yayıncının kamerası, altta oyun |
 | `KLIP_KAMERA` | 0.75,0.70,0.25,0.30 | Kamera kutusunun yeri: x,y,genişlik,yükseklik (görüntünün oranı olarak). Örnekteki değer sağ alt köşeyi gösterir |
 
+## YouTube'a otomatik paylaşım (Buffer)
+Edit'li Shorts videoları üretildikten sonra `edit/paylas.py` onları Buffer üzerinden YouTube kanalının kuyruğuna ekler. Videolar, Buffer'da o kanal için ayarlanan paylaşım saatlerinde yayınlanır.
+- Gerekli secret: `BUFFER_API_KEY`. Kanalın kendi Gmail'iyle açılan Buffer hesabının API anahtarı olmalı.
+- İsteğe bağlı değişkenler (Settings → Variables → Actions): `PAYLAS_ADET` bir çalışmada en fazla kaç video gönderileceğini belirler (varsayılan 1). `BUFFER_CHANNEL_ID` boş bırakılırsa hesaptaki YouTube kanalı otomatik bulunur.
+- Gönderilen videolar `paylasilanlar.txt` dosyasına yazılır ve bir daha gönderilmez. Her denemenin sonucu `paylasim_log.txt` dosyasında görülür.
+
 ## Bilgisayarda çalıştırmak
 ```bash
 TwitchDownloaderCLI chatdownload --id VOD_ID -o chat.json

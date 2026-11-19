@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""paylas.py - edit'li Shorts videolarini Buffer API ile YouTube kanalina gonderir.
+
+- duzenle/*.json senaryolarini sirayla gezer
+- edit-<VOD> release'inde videosu olan ve daha once paylasilmamis olanlari secer
+- Buffer'daki YouTube kanalinin kuyruguna (addToQueue) ekler
+- paylasilanlar.txt'ye yazar (bir daha gonderilmez), sonucu paylasim_log.txt'ye yazar
+
+Ortam degiskenleri:
+  BUFFER_API_KEY      (zorunlu) Buffer kisisel API anahtari
+  BUFFER_CHANNEL_ID   (istege bagli) bos ise hesaptaki ilk YouTube kanali kullanilir
+  PAYLAS_ADET         bir calismada en fazla kac video gonderilecegi (varsayilan 1)
+  GITHUB_REPOSITORY   release linklerini kurmak icin (Actions bunu kendisi verir)
+"""
+import datetime
+import glob
+import json
+import os
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PAYLASILANLAR = os.path.join(REPO, "paylasilanlar.txt")
+LOG = os.path.join(REPO, "paylasim_log.txt")
+API = "https://api.buffer.com"
+
+
+def log(satir):
+    zaman = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    print(satir, flush=True)
+    with open(LOG, "a", encoding="utf-8") as f:
+        f.write(f"{zaman}  {satir}\n")
+
+
+def gql(anahtar, sorgu, degiskenler=None):
+    govde = json.dumps({"query": sorgu, "variables": degiskenler or {}}).encode("utf-8")
+    istek = urllib.request.Request(API, data=govde, method="POST", headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {anahtar}",
+    })
+    try:
+        with urllib.request.urlopen(istek, timeout=60) as r:
+            cevap = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Buffer HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:300]}")
+    if cevap.get("errors"):
+        raise RuntimeError("Buffer hata: " + "; ".join(x.get("message", "?") for x in cevap["errors"]))
+    return cevap["data"]
+
+
+def youtube_kanali(anahtar):
+    kanal = os.environ.get("BUFFER_CHANNEL_ID", "").strip()
+    if kanal:
+        return kanal
+    orglar = gql(anahtar, "query { account { organizations { id name } } }")["account"]["organizations"]
+    for org in orglar:
+        kanallar = gql(anahtar, "query { channels(input: {organizationId: %s}) { id name service isDisconnected } }"
+                       % json.dumps(org["id"]))["channels"]
+        for k in kanallar:
+            if k["service"] == "youtube" and not k.get("isDisconnected"):
+                log(f"YouTube kanali bulundu: {k['name']} ({k['id']}), organizasyon: {org['name']}")
+                return k["id"]
+    raise RuntimeError("Bu Buffer hesabinda bagli bir YouTube kanali yok")
+
+
+def release_dosyalari(etiket):
+    r = subprocess.run(["gh", "release", "view", etiket, "--json", "assets"], capture_output=True, text=True)
+    if r.returncode != 0:
+        return set()
+    return {a["name"] for a in json.loads(r.stdout)["assets"]}
+
+
+def metinler(sen):
+    baslik = sen["baslik"].strip()
+    emoji = sen.get("baslik_emoji", "").strip()
+    yayinci = sen.get("yayinci", "").strip()
+    yt_baslik = f"{baslik} {emoji}".strip()
+    if len(yt_baslik) > 90:
+        yt_baslik = yt_baslik[:90].rstrip()
+    yt_baslik += " #shorts"
+    satirlar = [f"{baslik} {emoji}".strip(), ""]
+    if yayinci:
+        satirlar.append(f"🎮 Streamer: {yayinci} → https://www.twitch.tv/{yayinci.lower()}")
+    satirlar.append(f"📺 Full stream: https://www.twitch.tv/videos/{sen['vod']}")
+    satirlar += ["",
+                 "Subscribe for the wildest GTA 6 moments every day ⭐",
+                 "",
+                 "All clips credited to the original streamer. Not affiliated with Rockstar Games or Take-Two Interactive.",
+                 "",
+                 "#GTA6 #GTAVI #Shorts" + (f" #{yayinci}" if yayinci else "")]
+    return yt_baslik, "\n".join(satirlar)
+
+
+OLUSTUR = """
+mutation($input: CreatePostInput!) {
+  createPost(input: $input) {
+    ... on PostActionSuccess { post { id dueAt } }
+    ... on MutationError { message }
+  }
+}
+"""
+
+
+def main():
+    anahtar = os.environ.get("BUFFER_API_KEY", "").strip()
+    if not anahtar:
+        print("BUFFER_API_KEY yok, paylasim atlandi")
+        return 0
+    adet = int(os.environ.get("PAYLAS_ADET", "1") or "1")
+    depo = os.environ.get("GITHUB_REPOSITORY", "next-gen-studio/twitch-sohbet-klip")
+
+    paylasilan = set()
+    if os.path.exists(PAYLASILANLAR):
+        with open(PAYLASILANLAR, encoding="utf-8") as f:
+            paylasilan = {s.split("\t")[0] for s in f if s.strip()}
+
+    adaylar = []
+    for yol in sorted(glob.glob(os.path.join(REPO, "duzenle", "*.json"))):
+        with open(yol, encoding="utf-8") as f:
+            sen = json.load(f)
+        anahtar_ad = f"{sen['vod']}/{sen['klip']}"
+        if anahtar_ad in paylasilan:
+            continue
+        if "edit_" + sen["klip"] not in release_dosyalari(f"edit-{sen['vod']}"):
+            continue
+        adaylar.append((anahtar_ad, sen))
+
+    if not adaylar:
+        print("Paylasilacak yeni video yok")
+        return 0
+
+    try:
+        kanal = youtube_kanali(anahtar)
+    except Exception as e:  # noqa: BLE001
+        log(f"HATA kanal bulunamadi: {e}")
+        return 1
+
+    hata = 0
+    for anahtar_ad, sen in adaylar[:adet]:
+        url = f"https://github.com/{depo}/releases/download/edit-{sen['vod']}/edit_{sen['klip']}"
+        yt_baslik, aciklama = metinler(sen)
+        girdi = {
+            "text": aciklama,
+            "channelId": kanal,
+            "schedulingType": "automatic",
+            "mode": "addToQueue",
+            "needsApproval": False,
+            "assets": [{"videos": [{"url": url}]}],
+            "metadata": {"youtube": {"title": yt_baslik, "categoryId": "20"}},
+        }
+        try:
+            sonuc = gql(anahtar, OLUSTUR, {"input": girdi})["createPost"]
+        except Exception as e:  # noqa: BLE001
+            log(f"HATA {anahtar_ad}: {e}")
+            hata += 1
+            continue
+        if "post" in sonuc and sonuc["post"]:
+            p = sonuc["post"]
+            log(f"OK {anahtar_ad} -> Buffer post {p['id']}, zaman: {p.get('dueAt')}, baslik: {yt_baslik}")
+            with open(PAYLASILANLAR, "a", encoding="utf-8") as f:
+                f.write(f"{anahtar_ad}\t{p['id']}\t{p.get('dueAt')}\n")
+        else:
+            log(f"HATA {anahtar_ad}: {sonuc.get('message', sonuc)}")
+            hata += 1
+    return 1 if hata else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
