@@ -106,7 +106,7 @@ mutation($input: CreatePostInput!) {
 def main():
     anahtar = os.environ.get("BUFFER_API_KEY", "").strip()
     if not anahtar:
-        print("BUFFER_API_KEY yok, paylasim atlandi")
+        log("BUFFER_API_KEY secret bulunamadi, paylasim atlandi")
         return 0
     adet = int(os.environ.get("PAYLAS_ADET", "1") or "1")
     depo = os.environ.get("GITHUB_REPOSITORY", "next-gen-studio/twitch-sohbet-klip")
@@ -128,7 +128,7 @@ def main():
         adaylar.append((anahtar_ad, sen))
 
     if not adaylar:
-        print("Paylasilacak yeni video yok")
+        log("Paylasilacak yeni video yok")
         return 0
 
     try:
