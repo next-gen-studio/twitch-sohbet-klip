@@ -1,0 +1,43 @@
+name: Planli paylasim
+
+# Kendi planlamamiz: duzenle/*.json icindeki "plan" saati gelen videoyu Buffer'a shareNow ile gonderir.
+# Slotlar (Istanbul): 15:00, 18:00, 21:00, 00:00, 03:00, 06:00  = UTC 12, 15, 18, 21, 00, 03
+# :55'te asil calisma (plan saatinden 5 dk once), :20'de yedek (GitHub cron gecikirse / hata olursa).
+on:
+  schedule:
+    - cron: "55 2,11,14,17,20,23 * * *"
+    - cron: "20 0,3,12,15,18,21 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shorts-edit
+  cancel-in-progress: false
+
+jobs:
+  paylas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Plan saati gelen videoyu gonder
+        env:
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+          BUFFER_CHANNEL_ID: ${{ vars.BUFFER_CHANNEL_ID }}
+          PAYLAS_ADET: "0"
+        run: python3 edit/paylas.py
+
+      - name: Paylasim kaydini repoya yaz
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          for f in paylasilanlar.txt paylasim_log.txt silinenler.txt; do if [ -f "$f" ]; then git add -f "$f"; fi; done
+          if git diff --cached --quiet; then echo "degisiklik yok"; exit 0; fi
+          git commit -m "Planli paylasim kaydi [skip ci]"
+          git pull --rebase -q origin main && git push -q origin HEAD:main

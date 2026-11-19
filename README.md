@@ -49,6 +49,7 @@ Tarama günde 4 kez yapılır: İstanbul saatiyle 03:17, 09:17, 15:17 ve 21:17. 
 Edit'li Shorts videoları üretildikten sonra `edit/paylas.py` onları Buffer üzerinden YouTube kanalının kuyruğuna ekler. Videolar, Buffer'da o kanal için ayarlanan paylaşım saatlerinde yayınlanır.
 - Gerekli secret: `BUFFER_API_KEY`. Kanalın kendi Gmail'iyle açılan Buffer hesabının API anahtarı olmalı.
 - İsteğe bağlı değişkenler (Settings → Variables → Actions): `PAYLAS_ADET` bir çalışmada en fazla kaç video gönderileceğini belirler (varsayılan 1). `BUFFER_CHANNEL_ID` boş bırakılırsa hesaptaki YouTube kanalı otomatik bulunur.
+- **Kendi planlamamız (önerilen):** Senaryoda `"plan": "2026-11-20T15:00:00+03:00"` varsa video Buffer'da zamanlanmaz. `Planli paylasim` iş akışı her slotta (İstanbul 15:00, 18:00, 21:00, 00:00, 03:00, 06:00) çalışır ve saati gelen videoyu Buffer'a "hemen paylaş" olarak gönderir. Her çalışmada en fazla 1 video gider. `eski_post` verilmişse Buffer'daki eski zamanlanmış gönderi bir kez silinir (`silinenler.txt`).
 - Senaryoda `"zaman": "2026-11-20T15:00:00+03:00"` varsa video o saate planlanır, `"hemen": true` varsa hemen yayınlanır, hiçbiri yoksa kuyruğa eklenir.
 - Açıklamaya yayıncı adı, Twitch, yayın/video/klip ifadeleri ve link yazılmaz. Yazılırsa `paylas.py` bunları göndermeden önce siler.
 - Gönderilen videolar `paylasilanlar.txt` dosyasına yazılır ve bir daha gönderilmez. Her denemenin sonucu `paylasim_log.txt` dosyasında görülür.

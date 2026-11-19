@@ -25,6 +25,8 @@ import urllib.request
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAYLASILANLAR = os.path.join(REPO, "paylasilanlar.txt")
 LOG = os.path.join(REPO, "paylasim_log.txt")
+SILINENLER = os.path.join(REPO, "silinenler.txt")
+PLAN_ERKEN_DK = 15  # "plan" saatinden en fazla bu kadar dakika once gonderilir
 API = "https://api.buffer.com"
 
 
@@ -145,16 +147,46 @@ def main():
         with open(PAYLASILANLAR, encoding="utf-8") as f:
             paylasilan = {s.split("\t")[0] for s in f if s.strip()}
 
+    silinen = set()
+    if os.path.exists(SILINENLER):
+        with open(SILINENLER, encoding="utf-8") as f:
+            silinen = {s.strip() for s in f if s.strip()}
+    simdi = datetime.datetime.now(datetime.timezone.utc)
+
     adaylar = []
+    eski_silinecek = []
     for yol in sorted(glob.glob(os.path.join(REPO, "duzenle", "*.json"))):
         with open(yol, encoding="utf-8") as f:
             sen = json.load(f)
         anahtar_ad = f"{sen['vod']}/{sen['klip']}"
         if anahtar_ad in paylasilan:
             continue
+        if sen.get("plan"):
+            # Kendi planlamamiz: Buffer'da zamanlanmis gonderi tutulmaz, video plan saatinde shareNow ile gider.
+            if sen.get("eski_post") and sen["eski_post"] not in silinen:
+                eski_silinecek.append(sen["eski_post"])
+            p = datetime.datetime.fromisoformat(sen["plan"])
+            if p.tzinfo is None:
+                p = p.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=3)))
+            if p > simdi + datetime.timedelta(minutes=PLAN_ERKEN_DK):
+                continue
         if "edit_" + sen["klip"] not in release_dosyalari(f"edit-{sen['vod']}"):
             continue
         adaylar.append((anahtar_ad, sen))
+
+    if eski_silinecek:
+        try:
+            for pid in eski_silinecek:
+                try:
+                    gql(anahtar, "mutation { deletePost(input: {id: %s}) { __typename } }" % json.dumps(pid))
+                    log(f"Eski Buffer zamanlamasi silindi (kendi planimiza gecildi): {pid}")
+                except Exception as e:  # noqa: BLE001
+                    log(f"Eski Buffer gonderisi silinemedi ({pid}), zaten yok sayiliyor: {e}")
+                with open(SILINENLER, "a", encoding="utf-8") as f:
+                    f.write(pid + "\n")
+                silinen.add(pid)
+        except Exception as e:  # noqa: BLE001
+            log(f"HATA eski gonderi silme: {e}")
 
     if not adaylar:
         log("Paylasilacak yeni video yok")
@@ -167,13 +199,17 @@ def main():
         return 1
 
     hata = 0
-    hemen = [x for x in adaylar if x[1].get("hemen") or x[1].get("zaman")]
-    sira = hemen + [x for x in adaylar if not (x[1].get("hemen") or x[1].get("zaman"))][:max(0, adet - len(hemen))]
+    def _oncelikli(x):
+        return x[1].get("hemen") or x[1].get("zaman") or x[1].get("plan")
+    hemen = [x for x in adaylar if _oncelikli(x) and not x[1].get("plan")]
+    planli = sorted([x for x in adaylar if x[1].get("plan")], key=lambda x: x[1]["plan"])
+    hemen += planli[:1]  # her calismada en fazla 1 planli video (gecikenler sirayla sonraki saatlere kayar)
+    sira = hemen + [x for x in adaylar if not _oncelikli(x)][:max(0, adet - len(hemen))]
     for anahtar_ad, sen in sira:
         url = f"https://github.com/{depo}/releases/download/edit-{sen['vod']}/edit_{sen['klip']}"
         yt_baslik, aciklama = metinler(sen)
         aciklama = aciklama_temizle(aciklama)
-        mod, zaman = ("shareNow" if sen.get("hemen") else "addToQueue"), None
+        mod, zaman = ("shareNow" if (sen.get("hemen") or sen.get("plan")) else "addToQueue"), None
         if sen.get("zaman"):
             z = datetime.datetime.fromisoformat(sen["zaman"])
             if z.tzinfo is None:
@@ -194,7 +230,7 @@ def main():
         }
         if zaman:
             girdi["dueAt"] = zaman
-        if sen.get("eski_post"):
+        if sen.get("eski_post") and sen["eski_post"] not in silinen:
             try:
                 gql(anahtar, "mutation { deletePost(input: {id: %s}) { __typename } }" % json.dumps(sen["eski_post"]))
                 log(f"Eski kuyruk gonderisi silindi: {sen['eski_post']}")
