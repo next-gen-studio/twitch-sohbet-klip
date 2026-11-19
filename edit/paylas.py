@@ -82,16 +82,8 @@ def metinler(sen):
     if len(yt_baslik) > 90:
         yt_baslik = yt_baslik[:90].rstrip()
     yt_baslik += " #shorts"
-    satirlar = [f"{baslik} {emoji}".strip(), ""]
-    if yayinci:
-        satirlar.append(f"🎮 Streamer: {yayinci} → https://www.twitch.tv/{yayinci.lower()}")
-    satirlar.append(f"📺 Full stream: https://www.twitch.tv/videos/{sen['vod']}")
-    satirlar += ["",
-                 "Subscribe for the wildest GTA 6 moments every day ⭐",
-                 "",
-                 "All clips credited to the original streamer. Not affiliated with Rockstar Games or Take-Two Interactive.",
-                 "",
-                 "#GTA6 #GTAVI #Shorts" + (f" #{yayinci}" if yayinci else "")]
+    satirlar = [f"{baslik} {emoji}".strip(), "",
+                 "#GTA6 #GTAVI #GTA6Gameplay #GTA6Funny #GamingShorts #Shorts" + (f" #{yayinci}" if yayinci else "")]
     return yt_baslik, "\n".join(satirlar)
 
 
@@ -154,6 +146,14 @@ def main():
             "assets": [{"video": {"url": url}}],
             "metadata": {"youtube": {"title": yt_baslik, "categoryId": "20"}},
         }
+        if sen.get("eski_post"):
+            try:
+                gql(anahtar, "mutation { deletePost(input: {id: %s}) { __typename } }" % json.dumps(sen["eski_post"]))
+                log(f"Eski kuyruk gonderisi silindi: {sen['eski_post']}")
+            except Exception as e:  # noqa: BLE001
+                log(f"HATA eski gonderi silinemedi ({sen['eski_post']}), cift paylasim olmasin diye atlandi: {e}")
+                hata += 1
+                continue
         try:
             sonuc = gql(anahtar, OLUSTUR, {"input": girdi})["createPost"]
         except Exception as e:  # noqa: BLE001
