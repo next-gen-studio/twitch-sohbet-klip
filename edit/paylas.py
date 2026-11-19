@@ -147,7 +147,7 @@ def main():
             "schedulingType": "automatic",
             "mode": "addToQueue",
             "needsApproval": False,
-            "assets": [{"videos": [{"url": url}]}],
+            "assets": [{"video": {"url": url}}],
             "metadata": {"youtube": {"title": yt_baslik, "categoryId": "20"}},
         }
         try:
