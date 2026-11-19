@@ -29,12 +29,22 @@ jobs:
       sayi: ${{ steps.bul.outputs.sayi }}
     steps:
       - uses: actions/checkout@v5
+      - name: yt-dlp kur
+        run: pip install -q -U yt-dlp
       - id: bul
         env:
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
           EK: ${{ github.event.inputs.vod }}
         run: python3 bul_vodlar.py --ek "$EK"
+      - name: GTA 6 olmayan yayinlari kaydet
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add islenenler.txt
+          git diff --cached --quiet && exit 0
+          git commit -m "GTA 6 olmayan yayinlar atlandi [skip ci]"
+          git pull --rebase -q && git push
 
   klip:
     needs: bul
@@ -49,6 +59,7 @@ jobs:
     env:
       VOD: ${{ matrix.is.vod }}
       AYAR: ${{ matrix.is.ayar }}
+      YAYINCI: ${{ matrix.is.yayinci }}
       GH_TOKEN: ${{ github.token }}
       TWITCH_OAUTH: ${{ secrets.TWITCH_OAUTH }}
       KLIP_ADET: ${{ vars.KLIP_ADET || '10' }}
@@ -81,7 +92,7 @@ jobs:
           python3 sohbet_klip.py chat.json --vod "$VOD" \
             --adet "$KLIP_ADET" --sure "$KLIP_SURE" --once "$KLIP_ONCE" \
             --duzen "$KLIP_DUZEN" --kamera "$KLIP_KAMERA" \
-            --atla "$KLIP_ATLA" --mod "$KLIP_MOD" $AYAR
+            --atla "$KLIP_ATLA" --mod "$KLIP_MOD" --yayinci "$YAYINCI" $AYAR
 
       - name: Klipleri release olarak yayinla
         run: |
@@ -94,9 +105,9 @@ jobs:
           } > notlar.md
           gh release delete "vod-$VOD" -y --cleanup-tag 2>/dev/null || true
           gh release create "vod-$VOD" klipler/klipler.json klipler/*.mp4 \
-            --title "VOD $VOD klipleri" --notes-file notlar.md 2>/dev/null \
+            --title "VOD $VOD klipleri - $YAYINCI" --notes-file notlar.md 2>/dev/null \
           || gh release create "vod-$VOD" klipler/klipler.json \
-            --title "VOD $VOD klipleri" --notes-file notlar.md
+            --title "VOD $VOD klipleri - $YAYINCI" --notes-file notlar.md
 
   kaydet:
     needs: [bul, klip]

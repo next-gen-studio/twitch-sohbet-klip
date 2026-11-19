@@ -1,2 +1,13 @@
-# Takip edilecek Twitch yayincilari, her satira bir kullanici adi.
-# Otomatik tarama icin TWITCH_CLIENT_ID ve TWITCH_CLIENT_SECRET secret lari gerekir.
+# Takip edilen Twitch yayincilari: her satira bir kullanici adi, istenirse yanina ek ayar.
+# Twitch uygulama anahtari (TWITCH_CLIENT_ID/SECRET) yoksa yt-dlp ile taranir.
+# Sadece GTA 6 oynanan bolumler islenir (Twitch'in oyun bolumlerinden bulunur).
+# Kamera yerleri (bilgi icin): LIRIK yok, Jynxzi sol alt, NICKMERCS sag orta,
+# DarkViperAU sag ust, Quin69 sol ust, vanosscrew sag ust, TheBurntPeanut sol alt (avatar).
+# Shorts'ta yayinin tam karesi kullanildigi icin kamera kendi kosesinde gorunur.
+lirik
+jynxzi
+nickmercs
+darkviperau
+quin69
+vanosscrew
+theburntpeanut

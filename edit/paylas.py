@@ -16,6 +16,7 @@ import datetime
 import glob
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.error
@@ -72,6 +73,40 @@ def release_dosyalari(etiket):
     return {a["name"] for a in json.loads(r.stdout)["assets"]}
 
 
+def yasakli_kelimeler():
+    """Aciklamada gecmemesi gerekenler: yayinci adlari, Twitch, yayin/video ifadeleri, linkler."""
+    adlar = []
+    yol = os.path.join(REPO, "yayincilar.txt")
+    if os.path.exists(yol):
+        with open(yol, encoding="utf-8") as f:
+            for s in f:
+                s = s.split("#", 1)[0].strip()
+                if s:
+                    adlar.append(s.split()[0])
+    adlar += ["lirik", "jynxzi", "nickmercs", "darkviperau", "quin69", "vanoss", "vanosscrew",
+              "theburntpeanut", "burntpeanut"]
+    genel = ["twitch", "stream", "streams", "streamer", "streamers", "streaming", "livestream",
+             "vod", "vods", "video", "videos", "clip", "clips", "clipped", "kick", "youtube"]
+    return re.compile(r"(?i)(https?://\S+|\b(?:" + "|".join(re.escape(x) for x in set(adlar + genel)) + r")\b)")
+
+
+def aciklama_temizle(metin):
+    yasak = yasakli_kelimeler()
+    out = []
+    for satir in metin.split("\n"):
+        if satir.strip().startswith("#"):
+            etiketler = [e for e in satir.split() if not yasak.search(e.lstrip("#"))]
+            satir = " ".join(etiketler)
+            if satir:
+                out.append(satir)
+            continue
+        if yasak.search(satir):
+            log(f"UYARI aciklamadan cikarildi: {satir[:80]}")
+            continue
+        out.append(satir)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
+
+
 def metinler(sen):
     if sen.get("seo_baslik") and sen.get("seo_aciklama"):
         return sen["seo_baslik"][:100], sen["seo_aciklama"]
@@ -83,7 +118,7 @@ def metinler(sen):
         yt_baslik = yt_baslik[:90].rstrip()
     yt_baslik += " #shorts"
     satirlar = [f"{baslik} {emoji}".strip(), "",
-                 "#GTA6 #GTAVI #GTA6Gameplay #GTA6Funny #GamingShorts #Shorts" + (f" #{yayinci}" if yayinci else "")]
+                 "#GTA6 #GTAVI #GTA6Gameplay #GTA6Funny #GamingShorts #Shorts"]
     return yt_baslik, "\n".join(satirlar)
 
 
@@ -132,20 +167,33 @@ def main():
         return 1
 
     hata = 0
-    hemen = [x for x in adaylar if x[1].get("hemen")]
-    sira = hemen + [x for x in adaylar if not x[1].get("hemen")][:max(0, adet - len(hemen))]
+    hemen = [x for x in adaylar if x[1].get("hemen") or x[1].get("zaman")]
+    sira = hemen + [x for x in adaylar if not (x[1].get("hemen") or x[1].get("zaman"))][:max(0, adet - len(hemen))]
     for anahtar_ad, sen in sira:
         url = f"https://github.com/{depo}/releases/download/edit-{sen['vod']}/edit_{sen['klip']}"
         yt_baslik, aciklama = metinler(sen)
+        aciklama = aciklama_temizle(aciklama)
+        mod, zaman = ("shareNow" if sen.get("hemen") else "addToQueue"), None
+        if sen.get("zaman"):
+            z = datetime.datetime.fromisoformat(sen["zaman"])
+            if z.tzinfo is None:
+                z = z.replace(tzinfo=datetime.timezone(datetime.timedelta(hours=3)))  # Istanbul
+            if z > datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=5):
+                mod, zaman = "customScheduled", z.isoformat()
+            else:
+                mod = "shareNow"
+                log(f"{anahtar_ad}: zamani gecmis ({sen['zaman']}), hemen paylasiliyor")
         girdi = {
             "text": aciklama,
             "channelId": kanal,
             "schedulingType": "automatic",
-            "mode": "shareNow" if sen.get("hemen") else "addToQueue",
+            "mode": mod,
             "needsApproval": False,
             "assets": [{"video": {"url": url}}],
             "metadata": {"youtube": {"title": yt_baslik, "categoryId": "20"}},
         }
+        if zaman:
+            girdi["dueAt"] = zaman
         if sen.get("eski_post"):
             try:
                 gql(anahtar, "mutation { deletePost(input: {id: %s}) { __typename } }" % json.dumps(sen["eski_post"]))

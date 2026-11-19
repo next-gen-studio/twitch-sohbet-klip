@@ -15,6 +15,8 @@ import datetime as dt
 import json
 import os
 import re
+import subprocess
+import time
 import urllib.parse
 import urllib.request
 
@@ -76,11 +78,66 @@ def helix_vodlari(yayincilar, en_fazla, son_saat):
     return bulunan
 
 
+OYUN = re.compile(r"grand theft auto vi\b|gta ?6|gta vi\b", re.I)
+
+
+def ytdlp_json(argv):
+    r = subprocess.run(["yt-dlp", "-J", "--no-warnings", *argv], capture_output=True, text=True, timeout=180)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.strip()[-300:])
+    return json.loads(r.stdout)
+
+
+def yayinci_ayarlari():
+    """yayincilar.txt: 'ad [ek ayarlar]' -> {ad: ayar}"""
+    out = {}
+    for s in satirlar("yayincilar.txt"):
+        ad, _, ayar = s.partition(" ")
+        out[ad.lower()] = ayar.strip()
+    return out
+
+
+def ytdlp_vodlari(yayincilar, en_fazla, son_saat):
+    """Twitch uygulama anahtari olmadan: yt-dlp ile her yayincinin son yayinlari."""
+    bulunan = []
+    sinir = time.time() - son_saat * 3600
+    for ad in yayincilar:
+        try:
+            d = ytdlp_json(["--flat-playlist", "--playlist-end", str(en_fazla),
+                            f"https://www.twitch.tv/{ad}/videos?filter=archives&sort=time"])
+        except Exception as e:  # noqa: BLE001
+            print(f"{ad}: liste alinamadi: {e}")
+            continue
+        for e in d.get("entries") or []:
+            v = vod_id(e.get("id", "") or e.get("url", ""))
+            m = re.search(r"_(\d{10})/", e.get("thumbnail") or "")
+            if m and int(m.group(1)) < sinir:
+                continue
+            if v:
+                bulunan.append(v)
+    return bulunan
+
+
+def vod_bilgi(v):
+    """(yayinci, canli_mi, gta_bolumleri 'a-b,...' ya da None)"""
+    d = ytdlp_json(["--skip-download", f"https://www.twitch.tv/videos/{v}"])
+    canli = d.get("live_status") == "is_live" or d.get("is_live")
+    bolumler = [c for c in (d.get("chapters") or []) if OYUN.search(c.get("title") or "")]
+    if not bolumler and OYUN.search(d.get("title") or "") and not d.get("chapters"):
+        bolumler = [{"start_time": 0, "end_time": d.get("duration") or 10**6}]
+    # en az 10 dk suren GTA 6 bolumleri, toplamda en az 30 dk
+    bolumler = [c for c in bolumler if (c.get("end_time") or 0) - (c.get("start_time") or 0) >= 600]
+    if sum(c["end_time"] - c["start_time"] for c in bolumler) < 1800:
+        bolumler = []
+    aralik = ",".join(f"{int(c['start_time'])}-{int(c['end_time'])}" for c in bolumler) or None
+    return (d.get("uploader_id") or "").lower(), bool(canli), aralik
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--ek", default="", help="elle verilen VOD ID ya da linki")
-    p.add_argument("--en-fazla", type=int, default=2, help="yayinci basina en fazla VOD")
-    p.add_argument("--son-saat", type=int, default=48, help="bu kadar saatten eski VOD'lari atla")
+    p.add_argument("--en-fazla", type=int, default=3, help="yayinci basina en fazla VOD")
+    p.add_argument("--son-saat", type=int, default=72, help="bu kadar saatten eski VOD'lari atla")
     p.add_argument("--limit", type=int, default=6, help="bir calismada toplam en fazla VOD")
     a = p.parse_args()
 
@@ -95,14 +152,38 @@ def main():
                 print(f"UYARI: {v} icin gecersiz ayar yok sayildi: {ayar}")
                 ayar = ""
             adaylar.append((v, ayar))
-    adaylar += [(v, "") for v in helix_vodlari(satirlar("yayincilar.txt"), a.en_fazla, a.son_saat)]
+    ayarlar = yayinci_ayarlari()
+    adlar = list(ayarlar)
+    if os.environ.get("TWITCH_CLIENT_ID") and os.environ.get("TWITCH_CLIENT_SECRET"):
+        bulunan = helix_vodlari(adlar, a.en_fazla, a.son_saat)
+    else:
+        bulunan = ytdlp_vodlari(adlar, a.en_fazla, a.son_saat)
+    adaylar += [(v, "") for v in bulunan]
 
-    sonuc, gorulen = [], set()
+    sonuc, gorulen, atlanan = [], set(), []
     for v, ayar in adaylar:
-        if v not in islenen and v not in gorulen:
-            gorulen.add(v)
-            sonuc.append({"vod": v, "ayar": ayar})
-    sonuc = sonuc[: a.limit]
+        if v in islenen or v in gorulen or len(sonuc) >= a.limit:
+            continue
+        gorulen.add(v)
+        try:
+            yayinci, canli, bolum = vod_bilgi(v)
+        except Exception as e:  # noqa: BLE001
+            print(f"{v}: bilgi alinamadi, sonra tekrar denenecek: {e}")
+            continue
+        if canli:
+            print(f"{v} ({yayinci}): hala canli, yayin bitince islenecek.")
+            continue
+        if not bolum:
+            print(f"{v} ({yayinci}): GTA 6 bolumu yok, atlandi.")
+            atlanan.append(v)
+            continue
+        ayar = " ".join(x for x in [ayarlar.get(yayinci, ""), ayar, f"--bolum {bolum}"] if x)
+        print(f"{v} ({yayinci}): GTA 6 bolumleri {bolum}  ayar: {ayar}")
+        sonuc.append({"vod": v, "ayar": ayar, "yayinci": yayinci})
+    if atlanan:
+        with open("islenenler.txt", "a", encoding="utf-8") as f:
+            for v in atlanan:
+                f.write(f"{v}  # GTA 6 degil\n")
     print("Islenecek VOD'lar:", sonuc or "yok")
 
     cikti = os.environ.get("GITHUB_OUTPUT")

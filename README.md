@@ -30,6 +30,8 @@ Klipler **Releases** bölümünde `vod-<ID>` adıyla çıkar. Her klibin anı ve
    `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`
 3. `yayincilar.txt` dosyasına her satıra bir yayıncı adı yazın.
 
+Anahtar yoksa yayıncılar yt-dlp ile taranır, Twitch uygulaması gerekmez. Sadece Twitch'in "Grand Theft Auto VI" olarak işaretlediği bölümler (toplamda en az 30 dk) kliplenir; GTA 6 oynanmayan yayınlar atlanır.
+
 Tarama günde 4 kez yapılır: İstanbul saatiyle 03:17, 09:17, 15:17 ve 21:17. Son 48 saatin bitmiş yayınları işlenir. Hâlâ canlı olan yayınlar atlanır ve yayın bitince işlenir. Daha önce işlenen yayınlar (`islenenler.txt`) tekrar işlenmez.
 
 ### Ayarlar (Settings → Variables → Actions)
@@ -47,6 +49,8 @@ Tarama günde 4 kez yapılır: İstanbul saatiyle 03:17, 09:17, 15:17 ve 21:17. 
 Edit'li Shorts videoları üretildikten sonra `edit/paylas.py` onları Buffer üzerinden YouTube kanalının kuyruğuna ekler. Videolar, Buffer'da o kanal için ayarlanan paylaşım saatlerinde yayınlanır.
 - Gerekli secret: `BUFFER_API_KEY`. Kanalın kendi Gmail'iyle açılan Buffer hesabının API anahtarı olmalı.
 - İsteğe bağlı değişkenler (Settings → Variables → Actions): `PAYLAS_ADET` bir çalışmada en fazla kaç video gönderileceğini belirler (varsayılan 1). `BUFFER_CHANNEL_ID` boş bırakılırsa hesaptaki YouTube kanalı otomatik bulunur.
+- Senaryoda `"zaman": "2026-11-20T15:00:00+03:00"` varsa video o saate planlanır, `"hemen": true` varsa hemen yayınlanır, hiçbiri yoksa kuyruğa eklenir.
+- Açıklamaya yayıncı adı, Twitch, yayın/video/klip ifadeleri ve link yazılmaz. Yazılırsa `paylas.py` bunları göndermeden önce siler.
 - Gönderilen videolar `paylasilanlar.txt` dosyasına yazılır ve bir daha gönderilmez. Her denemenin sonucu `paylasim_log.txt` dosyasında görülür.
 
 ## Bilgisayarda çalıştırmak

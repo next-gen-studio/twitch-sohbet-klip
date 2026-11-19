@@ -73,6 +73,33 @@ def tepki(metin):
     return None
 
 
+METINLER = []  # (saniye, mesaj) - klipler.json'a ornek mesaj yazmak icin
+
+
+def ornek_mesajlar(bas, son, en_fazla=25):
+    """Klibin icindeki sohbetten tekrar etmeyen kisa ornekler (baslik yazmaya yardimci)."""
+    gorulen, out = set(), []
+    for t, m in METINLER:
+        if bas <= t <= son and m and len(m) <= 80:
+            k = m.lower()
+            if k not in gorulen:
+                gorulen.add(k)
+                out.append(m)
+    return out[:en_fazla]
+
+
+def bolum_filtre(ofsetler, bolum):
+    """--bolum "a-b,c-d": sadece bu saniye araliklarindaki mesajlar sayilir (or. GTA 6 bolumleri)."""
+    if not bolum:
+        return ofsetler
+    araliklar = []
+    for parca in bolum.split(","):
+        if "-" in parca:
+            a, b = parca.split("-", 1)
+            araliklar.append((float(a), float(b)))
+    return [o for o in ofsetler if any(a <= o[0] <= b for a, b in araliklar)]
+
+
 def sohbeti_oku(yol):
     with open(yol, encoding="utf-8") as f:
         veri = json.load(f)
@@ -84,6 +111,7 @@ def sohbeti_oku(yol):
             metin = msg.get("body") or " ".join(
                 fr.get("text", "") for fr in (msg.get("fragments") or []))
             ofsetler.append((float(t), tepki(metin)))
+            METINLER.append((float(t), (metin or "").strip()))
     uzunluk = None
     video = veri.get("video") or {}
     for anahtar in ("length", "end"):
@@ -253,6 +281,8 @@ def main():
                    help="x,y,genislik,yukseklik (0-1 arasi oran)")
     p.add_argument("--tdl", default=os.environ.get("TDL", "TwitchDownloaderCLI"))
     p.add_argument("--kalite", default="", help="or. 1080p60 (bos = en iyi)")
+    p.add_argument("--bolum", default="", help='sadece bu araliklar: "baslangic-bitis,..." (saniye)')
+    p.add_argument("--yayinci", default="", help="klipler.json'a yazilacak yayinci adi")
     p.add_argument("--sadece-bul", action="store_true",
                    help="klip kesmeden sadece anlari yazdir")
     a = p.parse_args()
@@ -264,6 +294,9 @@ def main():
         p.error("--kamera dort sayi olmali: x,y,genislik,yukseklik")
 
     ofsetler, uzunluk = sohbeti_oku(a.chat)
+    if a.bolum:
+        ofsetler = bolum_filtre(ofsetler, a.bolum)
+        print(f"Sadece su bolumler: {a.bolum} ({len(ofsetler)} mesaj)")
     print(f"{len(ofsetler)} mesaj okundu, "
           f"{sum(1 for _, t in ofsetler if t)} tanesi gulme/heyecan tepkisi.")
     anlar = anlari_bul(ofsetler, a.dilim, a.esik, a.aralik, a.adet, uzunluk, a.atla, a.mod)
@@ -309,7 +342,8 @@ def main():
             "dosya": ad, "an_sn": an["an"], "an": saat_yazi(an["an"]),
             "baslangic_sn": baslangic, "sure_sn": sure,
             "mesaj": an["mesaj"], "komik": an["komik"], "aksiyon": an["aksiyon"],
-            "tur": an["tur"], "z": an["z"], "vod": a.vod,
+            "tur": an["tur"], "z": an["z"], "vod": a.vod, "yayinci": a.yayinci,
+            "mesajlar": ornek_mesajlar(baslangic, baslangic + sure),
         })
 
     with open(os.path.join(a.cikti, "klipler.json"), "w", encoding="utf-8") as f:
