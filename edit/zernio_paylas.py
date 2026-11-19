@@ -23,6 +23,9 @@ import paylas as P
 
 API = "https://zernio.com/api/v1"
 
+# Zernio'nun gonderemedigi videolar; paylas.py bunlari ayni calismada Buffer ile dener.
+BASARISIZ = []
+
 
 def istek(anahtar, yol, govde=None, idem=None):
     veri = json.dumps(govde).encode("utf-8") if govde is not None else None
@@ -98,6 +101,7 @@ def main():
         hesap = youtube_hesabi(anahtar)
     except Exception as e:  # noqa: BLE001
         P.log(f"HATA Zernio: {e}")
+        BASARISIZ.extend(ad for ad, _ in adaylar)
         return 1
 
     hata = 0
@@ -148,8 +152,13 @@ def main():
                 f.write(f"{ad}\t{pid}\t{saat or simdi.isoformat()}\tzernio\n")
         else:
             msg = cevap.get("error") or cevap.get("message") or cevap
-            P.log(f"HATA {ad}: Zernio HTTP {kod}, durum: {durum}, {str(msg)[:300]}")
-            if kod == 207 and pid:  # kismen basarisiz ama post olustu; tekrar gondermeyelim
+            pmsg = [str(p.get("errorMessage") or p.get("error") or "") for p in post.get("platforms", []) or []]
+            pmsg = "; ".join(m for m in pmsg if m)
+            P.log(f"HATA {ad}: Zernio HTTP {kod}, durum: {durum}, {str(msg)[:300]}" + (f" | YouTube: {pmsg[:300]}" if pmsg else ""))
+            BASARISIZ.append(ad)
+            if os.environ.get("BUFFER_API_KEY", "").strip():
+                pass  # Buffer yedegi denenecek; kaydi Buffer basarili olursa o yazar
+            elif kod == 207 and pid:  # kismen basarisiz ama post olustu; tekrar gondermeyelim
                 with open(P.PAYLASILANLAR, "a", encoding="utf-8") as f:
                     f.write(f"{ad}\t{pid}\t{saat or simdi.isoformat()}\tzernio-207\n")
             hata += 1

@@ -136,17 +136,23 @@ mutation($input: CreatePostInput!) {
 
 def main():
     # Varsayilan servis Zernio; senaryoda "servis": "buffer" olanlar Buffer ile gonderilir.
+    # Zernio bir videoyu gonderemezse ayni calismada Buffer ile denenir (yedek).
     zernio_var = bool(os.environ.get("ZERNIO_API_KEY", "").strip())
     rc = 0
+    yedek = set()
     if zernio_var:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import zernio_paylas
         rc = zernio_paylas.main()
-    r = buffer_main(sadece_buffer=zernio_var)
+        yedek = set(zernio_paylas.BASARISIZ)
+        if yedek and os.environ.get("BUFFER_API_KEY", "").strip():
+            log(f"Zernio gonderemedi, Buffer yedegi deneniyor: {', '.join(sorted(yedek))}")
+            rc = 0  # sonucu Buffer belirler
+    r = buffer_main(sadece_buffer=zernio_var, yedek=yedek)
     return 1 if (rc or r) else 0
 
 
-def buffer_main(sadece_buffer=False):
+def buffer_main(sadece_buffer=False, yedek=()):
     anahtar = os.environ.get("BUFFER_API_KEY", "").strip()
     if not anahtar:
         if not sadece_buffer:
@@ -174,7 +180,7 @@ def buffer_main(sadece_buffer=False):
         anahtar_ad = f"{sen['vod']}/{sen['klip']}"
         if anahtar_ad in paylasilan:
             continue
-        if sadece_buffer and sen.get("servis") != "buffer":
+        if sadece_buffer and sen.get("servis") != "buffer" and anahtar_ad not in yedek:
             continue
         if sen.get("plan"):
             # Kendi planlamamiz: Buffer'da zamanlanmis gonderi tutulmaz, video plan saatinde shareNow ile gider.
