@@ -85,6 +85,8 @@ def main():
         ad = f"{sen['vod']}/{sen['klip']}"
         if ad in paylasilan or not (sen.get("hemen") or sen.get("plan") or sen.get("zaman")):
             continue
+        if sen.get("servis") == "buffer":  # bu senaryo Buffer ile gonderilir (paylas.py)
+            continue
         if "edit_" + sen["klip"] not in P.release_dosyalari(f"edit-{sen['vod']}"):
             continue
         adaylar.append((ad, sen))

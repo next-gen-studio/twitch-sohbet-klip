@@ -135,13 +135,22 @@ mutation($input: CreatePostInput!) {
 
 
 def main():
-    if os.environ.get("ZERNIO_API_KEY", "").strip():
+    # Varsayilan servis Zernio; senaryoda "servis": "buffer" olanlar Buffer ile gonderilir.
+    zernio_var = bool(os.environ.get("ZERNIO_API_KEY", "").strip())
+    rc = 0
+    if zernio_var:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import zernio_paylas
-        return zernio_paylas.main()
+        rc = zernio_paylas.main()
+    r = buffer_main(sadece_buffer=zernio_var)
+    return 1 if (rc or r) else 0
+
+
+def buffer_main(sadece_buffer=False):
     anahtar = os.environ.get("BUFFER_API_KEY", "").strip()
     if not anahtar:
-        log("BUFFER_API_KEY secret bulunamadi, paylasim atlandi")
+        if not sadece_buffer:
+            log("BUFFER_API_KEY secret bulunamadi, paylasim atlandi")
         return 0
     adet = int(os.environ.get("PAYLAS_ADET", "1") or "1")
     depo = os.environ.get("GITHUB_REPOSITORY", "next-gen-studio/twitch-sohbet-klip")
@@ -164,6 +173,8 @@ def main():
             sen = json.load(f)
         anahtar_ad = f"{sen['vod']}/{sen['klip']}"
         if anahtar_ad in paylasilan:
+            continue
+        if sadece_buffer and sen.get("servis") != "buffer":
             continue
         if sen.get("plan"):
             # Kendi planlamamiz: Buffer'da zamanlanmis gonderi tutulmaz, video plan saatinde shareNow ile gider.
@@ -193,7 +204,8 @@ def main():
             log(f"HATA eski gonderi silme: {e}")
 
     if not adaylar:
-        log("Paylasilacak yeni video yok")
+        if not sadece_buffer:
+            log("Paylasilacak yeni video yok")
         return 0
 
     try:
