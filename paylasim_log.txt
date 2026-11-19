@@ -17,3 +17,8 @@
 2026-11-19 11:34 UTC  OK 2932226282/klip_03_komik_87m40s.mp4 -> Buffer post 6afedea8503d635e7b3a7566, zaman: 2026-11-19T18:00:00.000Z, baslik: GTA 6 Traffic Crash Turned Into Total Chaos 🚗💥 #gta6 #shorts
 2026-11-19 11:34 UTC  OK 2932568279/klip_02_komik_193m30s.mp4 -> Buffer post 6afedea821d2e9be09382dab, zaman: 2026-11-19T15:00:00.000Z, baslik: GTA 6 Skydive Challenge Ends in Disaster 🪂💀 #gta6 #shorts
 2026-11-19 11:34 UTC  OK 2932568279/klip_04_komik_180m00s.mp4 -> Buffer post 6afedea956a8bceaa907d0ac, zaman: 2026-11-20T03:00:00.000Z, baslik: GTA 6 Tower Jump With No Parachute 🗼💀 #gta6 #shorts
+2026-11-19 16:39 UTC  YouTube kanali bulundu: Wanted Level Clips (6afe3fd7ece6dfde5f159540), organizasyon: My organization
+2026-11-19 16:39 UTC  Eski kuyruk gonderisi silindi: 6afedea756a8bceaa907d007
+2026-11-19 16:39 UTC  HATA 2932226282/klip_01_komik_731m00s.mp4: You have already scheduled the maximum number of posts YouTube allows in a day (2). Please consider scheduling this post for another day.
+2026-11-19 16:39 UTC  Eski kuyruk gonderisi silindi: 6afedea821d2e9be09382dab
+2026-11-19 16:39 UTC  HATA 2932568279/klip_02_komik_193m30s.mp4: You have already scheduled the maximum number of posts YouTube allows in a day (2). Please consider scheduling this post for another day.
