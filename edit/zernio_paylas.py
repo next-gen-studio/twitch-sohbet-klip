@@ -54,7 +54,16 @@ def bekleyenleri_oku():
 
 
 def bekleyen_yaz(ad, sen, baslik, devam):
-    """Listede yoksa ekler, varsa devam zamanini gunceller."""
+    """Listede yoksa ekler, varsa devam zamanini gunceller.
+    paylasilanlar.txt'ye de 'bekliyor' etiketiyle yazar: boylece Buffer'a gitmez ve basarisiz sayilmaz;
+    yeniden deneme bekleyen_yuklemeler.txt'den yapilir."""
+    pay = set()
+    if os.path.exists(P.PAYLASILANLAR):
+        with open(P.PAYLASILANLAR, encoding="utf-8") as f:
+            pay = {s.split("\t")[0] for s in f if s.strip()}
+    if ad not in pay:
+        with open(P.PAYLASILANLAR, "a", encoding="utf-8") as f:
+            f.write(f"{ad}\t-\t{datetime.datetime.now(datetime.timezone.utc).isoformat()}\tbekliyor\n")
     satirlar = []
     if os.path.exists(BEKLEYEN):
         with open(BEKLEYEN, encoding="utf-8") as f:
