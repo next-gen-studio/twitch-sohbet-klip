@@ -75,3 +75,5 @@
 2026-11-20 13:29 UTC  Zernio: paylasilacak yeni video yok
 2026-11-20 14:38 UTC  Zernio: paylasilacak yeni video yok
 2026-11-20 15:40 UTC  Zernio: paylasilacak yeni video yok
+2026-11-20 16:07 UTC  Zernio YouTube hesabi bulundu: Wanted Level Clips / wantedlevelclips-m7z (6aff41203d688edb70d3380d)
+2026-11-20 16:07 UTC  BEKLIYOR 2934276428/klip_02_komik_308m10s.mp4: Zernio HTTP 429, YouTube gunluk yukleme limiti dolu, devam: 2026-11-20T19:08:01Z. Video saklandi (silinmedi), Buffer'a gonderilmedi, limit acilinca otomatik yuklenecek
