@@ -16,6 +16,7 @@ import glob
 import hashlib
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 
@@ -25,6 +26,64 @@ API = "https://zernio.com/api/v1"
 
 # Zernio'nun gonderemedigi videolar; paylas.py bunlari ayni calismada Buffer ile dener.
 BASARISIZ = []
+
+# YouTube gunluk yukleme limiti (HTTP 429 "daily upload limit") yuzunden yuklenemeyenler.
+# KULLANICI KURALI (20 Kas 2026): bunlar silinmez, Buffer'a gonderilmez; limit acilinca otomatik yuklenir.
+BEKLEYEN = os.path.join(P.REPO, "bekleyen_yuklemeler.txt")
+LIMIT_RE = re.compile(r"resumes after (\d{4}-\d\d-\d\dT[\d:.]+Z?)")
+
+
+def bekleyenleri_oku():
+    """{vod/klip: devam_zamani (datetime veya None)} - dosyadaki sirayla."""
+    sonuc = {}
+    if not os.path.exists(BEKLEYEN):
+        return sonuc
+    with open(BEKLEYEN, encoding="utf-8") as f:
+        for s in f:
+            if not s.strip() or s.startswith("#"):
+                continue
+            k = s.rstrip("\n").split("\t")
+            devam = None
+            if len(k) > 4 and k[4].strip():
+                try:
+                    devam = datetime.datetime.fromisoformat(k[4].strip().replace("Z", "+00:00"))
+                except ValueError:
+                    devam = None
+            sonuc[k[0]] = devam
+    return sonuc
+
+
+def bekleyen_yaz(ad, sen, baslik, devam):
+    """Listede yoksa ekler, varsa devam zamanini gunceller."""
+    satirlar = []
+    if os.path.exists(BEKLEYEN):
+        with open(BEKLEYEN, encoding="utf-8") as f:
+            satirlar = f.read().splitlines()
+    devam_s = devam.strftime("%Y-%m-%dT%H:%M:%SZ") if devam else ""
+    simdi = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M")
+    yeni = f"{ad}\tedit-{sen['vod']}/edit_{sen['klip']}\t{baslik}\t{simdi}\t{devam_s}"
+    for i, s in enumerate(satirlar):
+        if s.split("\t")[0] == ad:
+            k = s.split("\t")
+            while len(k) < 5:
+                k.append("")
+            k[4] = devam_s
+            satirlar[i] = "\t".join(k)
+            break
+    else:
+        satirlar.append(yeni)
+    with open(BEKLEYEN, "w", encoding="utf-8") as f:
+        f.write("\n".join(satirlar) + "\n")
+
+
+def bekleyenden_cikar(ad):
+    if not os.path.exists(BEKLEYEN):
+        return
+    with open(BEKLEYEN, encoding="utf-8") as f:
+        satirlar = f.read().splitlines()
+    satirlar = [s for s in satirlar if s.startswith("#") or not s.strip() or s.split("\t")[0] != ad]
+    with open(BEKLEYEN, "w", encoding="utf-8") as f:
+        f.write("\n".join(satirlar) + "\n")
 
 
 def istek(anahtar, yol, govde=None, idem=None):
@@ -81,11 +140,19 @@ def main():
             paylasilan = {s.split("\t")[0] for s in f if s.strip()}
     simdi = datetime.datetime.now(datetime.timezone.utc)
 
-    adaylar = []
+    bekleyen = bekleyenleri_oku()
+    bekleyen_adaylar, adaylar = [], []
     for yol in sorted(glob.glob(os.path.join(P.REPO, "duzenle", "*.json"))):
         with open(yol, encoding="utf-8") as f:
             sen = json.load(f)
         ad = f"{sen['vod']}/{sen['klip']}"
+        if ad in bekleyen:
+            devam = bekleyen[ad]
+            if devam and devam > simdi:
+                continue  # limit henuz acilmadi; saklaniyor
+            if "edit_" + sen["klip"] in P.release_dosyalari(f"edit-{sen['vod']}"):
+                bekleyen_adaylar.append((ad, sen))
+            continue
         if ad in paylasilan or not (sen.get("hemen") or sen.get("plan") or sen.get("zaman")):
             continue
         if sen.get("servis") == "buffer":  # bu senaryo Buffer ile gonderilir (paylas.py)
@@ -93,6 +160,11 @@ def main():
         if "edit_" + sen["klip"] not in P.release_dosyalari(f"edit-{sen['vod']}"):
             continue
         adaylar.append((ad, sen))
+    # Once limit yuzunden bekleyenler (listedeki sirayla), sonra yeniler.
+    sira = list(bekleyen)
+    bekleyen_adaylar.sort(key=lambda x: sira.index(x[0]))
+    bekleyen_set = {ad for ad, _ in bekleyen_adaylar}
+    adaylar = bekleyen_adaylar + adaylar
     if not adaylar:
         P.log("Zernio: paylasilacak yeni video yok")
         return 0
@@ -105,7 +177,13 @@ def main():
         return 1
 
     hata = 0
+    limit_devam = None  # bu calismada limite takildiysak kalanlar API'ye gonderilmeden saklanir
     for ad, sen in adaylar:
+        if limit_devam is not None:
+            baslik, _ = P.metinler(sen)
+            bekleyen_yaz(ad, sen, baslik, limit_devam or None)
+            P.log(f"BEKLIYOR {ad}: YouTube gunluk limiti dolu, video saklandi (silinmedi), limit acilinca yuklenecek")
+            continue
         url = f"https://github.com/{depo}/releases/download/edit-{sen['vod']}/edit_{sen['klip']}"
         baslik, aciklama = P.metinler(sen)
         aciklama = P.aciklama_temizle(aciklama)
@@ -134,7 +212,10 @@ def main():
         else:
             govde["publishNow"] = True
             mod = "hemen"
-        idem = hashlib.sha256(f"wlc-{ad}-{saat or 'hemen'}".encode()).hexdigest()[:40]
+        anah = f"wlc-{ad}-{saat or 'hemen'}"
+        if ad in bekleyen_set:  # ilk deneme 429 aldi; ayni idempotency anahtari eski cevabi dondurmesin
+            anah += "-tekrar-" + simdi.strftime("%Y%m%d%H")
+        idem = hashlib.sha256(anah.encode()).hexdigest()[:40]
         kod, cevap = istek(anahtar, "/posts", govde, idem)
         post = cevap.get("post") or {} if isinstance(cevap, dict) else {}
         pid = post.get("_id") or post.get("id") or (cevap.get("details", {}) or {}).get("existingPostId")
@@ -143,7 +224,9 @@ def main():
         for p in post.get("platforms", []) or []:
             link = p.get("platformPostUrl") or link
         if kod in (200, 201) and durum not in ("failed",):
-            P.log(f"OK {ad} -> Zernio post {pid} ({mod}), durum: {durum}, link: {link or '-'}, baslik: {baslik}")
+            ek = " (bekleyen video, limit acildiktan sonra)" if ad in bekleyen_set else ""
+            P.log(f"OK {ad} -> Zernio post {pid} ({mod}), durum: {durum}, link: {link or '-'}, baslik: {baslik}{ek}")
+            bekleyenden_cikar(ad)
             with open(P.PAYLASILANLAR, "a", encoding="utf-8") as f:
                 f.write(f"{ad}\t{pid}\t{saat or simdi.isoformat()}\tzernio\n")
         elif kod == 409 and pid:
@@ -154,6 +237,23 @@ def main():
             msg = cevap.get("error") or cevap.get("message") or cevap
             pmsg = [str(p.get("errorMessage") or p.get("error") or "") for p in post.get("platforms", []) or []]
             pmsg = "; ".join(m for m in pmsg if m)
+            tum = f"{msg} {pmsg}"
+            if kod == 429 or "daily upload limit" in tum.lower():
+                m = LIMIT_RE.search(tum)
+                devam = None
+                if m:
+                    try:
+                        devam = datetime.datetime.fromisoformat(m.group(1).replace("Z", "+00:00"))
+                    except ValueError:
+                        devam = None
+                if devam is None:
+                    devam = simdi + datetime.timedelta(hours=6)
+                limit_devam = devam
+                bekleyen_yaz(ad, sen, baslik, devam)
+                P.log(f"BEKLIYOR {ad}: Zernio HTTP {kod}, YouTube gunluk yukleme limiti dolu, devam: "
+                      f"{devam.strftime('%Y-%m-%dT%H:%M:%SZ')}. Video saklandi (silinmedi), Buffer'a gonderilmedi, "
+                      f"limit acilinca otomatik yuklenecek")
+                continue
             P.log(f"HATA {ad}: Zernio HTTP {kod}, durum: {durum}, {str(msg)[:300]}" + (f" | YouTube: {pmsg[:300]}" if pmsg else ""))
             BASARISIZ.append(ad)
             if os.environ.get("BUFFER_API_KEY", "").strip():
