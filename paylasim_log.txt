@@ -60,3 +60,8 @@
 2026-11-20 01:05 UTC  OK 2932469290/klip_03_komik_148m20s.mp4 -> Buffer post 6aff9ced0f5eda1a57adde72, zaman: 2026-11-20T01:05:49.752Z, baslik: GTA 6 Biking Into Oncoming Highway Traffic 🚲😳 #gta6 #shorts
 2026-11-20 01:26 UTC  Zernio: paylasilacak yeni video yok
 2026-11-20 03:37 UTC  Zernio: paylasilacak yeni video yok
+2026-11-20 04:03 UTC  Zernio YouTube hesabi bulundu: Wanted Level Clips / wantedlevelclips-m7z (6aff41203d688edb70d3380d)
+2026-11-20 04:03 UTC  HATA 2933861646/klip_01_komik_119m10s.mp4: Zernio HTTP 429, durum: None, YouTube upload failed: YouTube daily upload limit reached for this channel. Please try again tomorrow. Posting to this account resumes after 2026-11-20T19:08:01.519Z. Schedule the post after that time instead.
+2026-11-20 04:03 UTC  Zernio gonderemedi, Buffer yedegi deneniyor: 2933861646/klip_01_komik_119m10s.mp4
+2026-11-20 04:03 UTC  YouTube kanali bulundu: Wanted Level Clips (6afe3fd7ece6dfde5f159540), organizasyon: My organization
+2026-11-20 04:03 UTC  OK 2933861646/klip_01_komik_119m10s.mp4 -> Buffer post 6affc6a14c1afd05deeea601, zaman: 2026-11-20T04:03:45.115Z, baslik: GTA 6 Mission Fail: He Ignited the Gas Can Himself 💀 #gta6 #shorts
