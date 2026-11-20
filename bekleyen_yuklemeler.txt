@@ -1,0 +1,8 @@
+# YouTube gunluk yukleme limiti (Zernio HTTP 429 "daily upload limit reached") yuzunden YouTube'a
+# yuklenemeyen videolar. KULLANICI KURALI (20 Kas 2026): bunlar SILINMEYECEK, sonra yuklenecek.
+# Render edilmis dosyalar edit-<VOD> release'lerinde duruyor (edit_<klip>). Release/asset silme!
+# Bu listedekiler paylasilanlar.txt'de Buffer olarak gorunuyor ama YouTube'a ulasmadi.
+# Format: vod/klip <TAB> release asset <TAB> YouTube basligi <TAB> hata zamani (UTC)
+2932469290/klip_03_komik_148m20s.mp4	edit-2932469290/edit_klip_03_komik_148m20s.mp4	GTA 6 Biking Into Oncoming Highway Traffic 🚲😳 #gta6 #shorts	2026-11-20 01:05
+2933861646/klip_01_komik_119m10s.mp4	edit-2933861646/edit_klip_01_komik_119m10s.mp4	GTA 6 Mission Fail: He Ignited the Gas Can Himself 💀 #gta6 #shorts	2026-11-20 04:03
+2933650141/klip_01_komik_241m40s.mp4	edit-2933650141/edit_klip_01_komik_241m40s.mp4	GTA 6 Highway Carjack Attempt Goes Wrong Fast 💀 #gta6 #shorts	2026-11-20 13:04
